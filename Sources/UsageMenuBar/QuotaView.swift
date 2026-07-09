@@ -65,10 +65,10 @@ struct ProviderCard: View {
             Text(quota.name)
                 .font(.subheadline.bold())
             if let pct = quota.fiveHourPct, let resets = quota.fiveHourResetsAt {
-                QuotaBar(label: "5-hour", pct: pct, resetsAt: resets, now: now)
+                QuotaBar(label: "5-hour used", pct: pct, resetsAt: resets, now: now)
             }
             if let pct = quota.weeklyPct, let resets = quota.weeklyResetsAt {
-                QuotaBar(label: "Weekly", pct: pct, resetsAt: resets, now: now)
+                QuotaBar(label: "Weekly used", pct: pct, resetsAt: resets, now: now)
             }
             if let staleness = quota.staleness, staleness > 3600 {
                 Text("stale · \(Int(staleness / 3600))h since last use")
@@ -96,6 +96,9 @@ struct QuotaView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Usage Quotas")
                 .font(.headline)
+            Text("% used, not remaining (Codex's own app shows remaining)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
                 .padding(.bottom, 2)
 
             HStack(alignment: .top, spacing: 10) {
@@ -156,6 +159,6 @@ struct MenuBarLabel: View {
     private func labelText(codex: Double?, claude: Double?) -> String {
         let c = codex.map { "\(Int($0.rounded()))%" } ?? "--"
         let cl = claude.map { "\(Int($0.rounded()))%" } ?? "--"
-        return "C \(c) · CC \(cl)"
+        return "C \(c)u · CC \(cl)u"
     }
 }
