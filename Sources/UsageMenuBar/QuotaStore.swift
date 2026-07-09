@@ -7,7 +7,11 @@ final class QuotaStore: ObservableObject {
     @Published var codex: ProviderQuota?
     @Published var lastError: String?
 
-    private let claudePath = NSString(string: "~/.claude/usage-dashboard/claude-rate-limits.json").expandingTildeInPath
+    // Prefer the multi-device merged snapshot (freshest across this Mac +
+    // any synced remote devices — see sync-claude-limits.sh); fall back to
+    // this device's own raw capture if the merge hasn't run yet.
+    private let claudeMergedPath = NSString(string: "~/.claude/usage-dashboard/claude-rate-limits-merged.json").expandingTildeInPath
+    private let claudeLocalPath = NSString(string: "~/.claude/usage-dashboard/claude-rate-limits.json").expandingTildeInPath
     private let codexPath = NSString(string: "~/.claude/usage-dashboard/codex-rate-limits.json").expandingTildeInPath
 
     private var timer: Timer?
@@ -38,7 +42,8 @@ final class QuotaStore: ObservableObject {
     }
 
     private func loadClaude() -> ProviderQuota? {
-        guard let data = FileManager.default.contents(atPath: claudePath) else { return nil }
+        let path = FileManager.default.fileExists(atPath: claudeMergedPath) ? claudeMergedPath : claudeLocalPath
+        guard let data = FileManager.default.contents(atPath: path) else { return nil }
         guard let decoded = try? JSONDecoder().decode(ClaudeLimits.self, from: data) else { return nil }
         let capturedAt = parseDate(decoded.captured_at)
         let staleness = capturedAt.map { Date().timeIntervalSince($0) }
@@ -49,7 +54,8 @@ final class QuotaStore: ObservableObject {
             fiveHourResetsAt: Date(timeIntervalSince1970: decoded.five_hour.resets_at),
             weeklyPct: decoded.seven_day.used_percentage,
             weeklyResetsAt: Date(timeIntervalSince1970: decoded.seven_day.resets_at),
-            staleness: staleness
+            staleness: staleness,
+            sourceDevice: decoded.source_device
         )
     }
 
@@ -65,7 +71,8 @@ final class QuotaStore: ObservableObject {
             fiveHourResetsAt: Date(timeIntervalSince1970: decoded.primary.resets_at),
             weeklyPct: decoded.secondary.used_percent,
             weeklyResetsAt: Date(timeIntervalSince1970: decoded.secondary.resets_at),
-            staleness: staleness
+            staleness: staleness,
+            sourceDevice: nil
         )
     }
 }

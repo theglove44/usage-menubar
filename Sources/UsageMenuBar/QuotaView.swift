@@ -75,6 +75,11 @@ struct ProviderCard: View {
                     .font(.caption2)
                     .foregroundStyle(.orange)
             }
+            if let device = quota.sourceDevice, device != "local" {
+                Text("via \(device)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))

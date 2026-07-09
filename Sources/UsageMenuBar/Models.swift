@@ -10,6 +10,10 @@ struct ClaudeLimits: Decodable {
     let seven_day: Window
     let cost_usd: Double?
     let model: String?
+    // Present when read from claude-rate-limits-merged.json: which device
+    // (this Mac, or a synced remote like "mac-mini") produced the freshest
+    // snapshot. Absent when reading the raw per-device file directly.
+    let source_device: String?
 }
 
 struct CodexLimits: Decodable {
@@ -33,4 +37,5 @@ struct ProviderQuota: Identifiable {
     let weeklyPct: Double?
     let weeklyResetsAt: Date?
     let staleness: TimeInterval? // seconds since the snapshot file was captured
+    let sourceDevice: String? // which device the freshest reading came from, when known
 }
