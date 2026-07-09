@@ -12,7 +12,8 @@ Reads two JSON snapshot files directly off disk, polling every 20s:
 - `~/.claude/usage-dashboard/codex-rate-limits.json`
 
 Both files are written by the companion dashboard project at
-`~/.claude/usage-dashboard/` (statusline hook writes the Claude one on every
+`~/.claude/usage-dashboard/` ([theglove44/usage-dashboard](https://github.com/theglove44/usage-dashboard),
+own git repo, separate from this one) — statusline hook writes the Claude one on every
 render; `codex-live-limits.mjs` / `parse-codex-logs.mjs` write the Codex one).
 This app is a pure reader — it never talks to Codex, Claude, or any network
 endpoint. If those JSON files are missing, the relevant provider card just

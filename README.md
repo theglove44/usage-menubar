@@ -22,7 +22,8 @@ or Claude's servers:
 - `~/.claude/usage-dashboard/codex-rate-limits.json`
 
 Both are written by the companion dashboard at `~/.claude/usage-dashboard/`
-(see that project for how the snapshots themselves get captured).
+([theglove44/usage-dashboard](https://github.com/theglove44/usage-dashboard) —
+see that repo for how the snapshots themselves get captured).
 
 ## Build & install
 
