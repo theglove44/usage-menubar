@@ -71,7 +71,7 @@ struct ProviderCard: View {
                 QuotaBar(label: "Weekly used", pct: pct, resetsAt: resets, now: now)
             }
             if let staleness = quota.staleness, staleness > 3600 {
-                Text("stale · \(Int(staleness / 3600))h since last use")
+                Text("frozen · no \(quota.name) session in \(Int(staleness / 3600))h")
                     .font(.caption2)
                     .foregroundStyle(.orange)
             }
