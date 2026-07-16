@@ -1,10 +1,12 @@
 import SwiftUI
 
 func barColor(_ pct: Double) -> Color {
-    if pct >= 85 { return .red }
-    if pct >= 60 { return .orange
-    }
-    return .green
+    let progress = min(max(pct, 0), 100) / 100
+    return Color(
+        hue: 0.14 * (1 - progress),
+        saturation: 0.95,
+        brightness: 1
+    )
 }
 
 func formatCountdown(to date: Date, now: Date) -> String {
@@ -40,15 +42,38 @@ struct QuotaBar: View {
                     .foregroundStyle(barColor(pct))
             }
             GeometryReader { geo in
+                let clampedPct = min(max(pct, 0), 100)
+                let progress = clampedPct / 100
+                let fillWidth = geo.size.width * progress
+                let flameSize = 14.0
+                let flameX = min(
+                    max(fillWidth, flameSize / 2),
+                    geo.size.width - flameSize / 2
+                )
+
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.secondary.opacity(0.2))
+                        .frame(height: 7)
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(barColor(pct))
-                        .frame(width: max(2, geo.size.width * min(pct, 100) / 100))
+                        .fill(barColor(clampedPct))
+                        .frame(width: max(2, fillWidth), height: 7)
+                    Text("🔥")
+                        .font(.system(size: flameSize))
+                        .frame(width: flameSize, height: flameSize)
+                        .offset(x: flameX - flameSize / 2)
+                        .shadow(
+                            color: barColor(clampedPct).opacity(progress),
+                            radius: progress * 3
+                        )
                 }
+                .frame(maxHeight: .infinity)
+                .animation(.easeInOut(duration: 0.35), value: clampedPct)
             }
-            .frame(height: 6)
+            .frame(height: 16)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(label) usage")
+            .accessibilityValue("\(Int(pct.rounded())) percent")
             Text(formatCountdown(to: resetsAt, now: now))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
