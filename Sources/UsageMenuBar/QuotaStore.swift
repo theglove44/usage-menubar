@@ -64,13 +64,15 @@ final class QuotaStore: ObservableObject {
         guard let decoded = try? JSONDecoder().decode(CodexLimits.self, from: data) else { return nil }
         let capturedAt = parseDate(decoded.captured_at)
         let staleness = capturedAt.map { Date().timeIntervalSince($0) }
+        let fiveHour = decoded.fiveHourWindow
+        let weekly = decoded.weeklyWindow
         return ProviderQuota(
             id: "codex",
             name: "Codex",
-            fiveHourPct: decoded.primary.used_percent,
-            fiveHourResetsAt: Date(timeIntervalSince1970: decoded.primary.resets_at),
-            weeklyPct: decoded.secondary.used_percent,
-            weeklyResetsAt: Date(timeIntervalSince1970: decoded.secondary.resets_at),
+            fiveHourPct: fiveHour?.used_percent,
+            fiveHourResetsAt: fiveHour.map { Date(timeIntervalSince1970: $0.resets_at) },
+            weeklyPct: weekly?.used_percent,
+            weeklyResetsAt: weekly.map { Date(timeIntervalSince1970: $0.resets_at) },
             staleness: staleness,
             sourceDevice: nil
         )

@@ -96,7 +96,7 @@ struct ProviderCard: View {
                 QuotaBar(label: "Weekly used", pct: pct, resetsAt: resets, now: now)
             }
             if let staleness = quota.staleness, staleness > 3600 {
-                Text("frozen · no \(quota.name) session in \(Int(staleness / 3600))h")
+                Text(stalenessText(hours: Int(staleness / 3600)))
                     .font(.caption2)
                     .foregroundStyle(.orange)
             }
@@ -108,6 +108,13 @@ struct ProviderCard: View {
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))
+    }
+
+    private func stalenessText(hours: Int) -> String {
+        if quota.id == "codex" {
+            return "quota snapshot \(hours)h old"
+        }
+        return "frozen · no \(quota.name) session in \(hours)h"
     }
 }
 
@@ -176,7 +183,7 @@ struct MenuBarLabel: View {
     @ObservedObject var store: QuotaStore
 
     var body: some View {
-        let codexPct = store.codex?.fiveHourPct
+        let codexPct = store.codex.flatMap { $0.fiveHourPct ?? $0.weeklyPct }
         let claudePct = store.claude?.fiveHourPct
         Text(labelText(codex: codexPct, claude: claudePct))
     }

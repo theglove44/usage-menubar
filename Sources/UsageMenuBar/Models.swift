@@ -23,9 +23,21 @@ struct CodexLimits: Decodable {
         let resets_at: Double
     }
     let captured_at: String
-    let primary: Window
-    let secondary: Window
+    let primary: Window?
+    let secondary: Window?
     let plan_type: String?
+
+    private var windows: [Window] {
+        [primary, secondary].compactMap { $0 }
+    }
+
+    var fiveHourWindow: Window? {
+        windows.first { $0.window_minutes < 24 * 60 }
+    }
+
+    var weeklyWindow: Window? {
+        windows.first { $0.window_minutes >= 24 * 60 }
+    }
 }
 
 // Unified shape the view renders, so Claude/Codex share one code path.
