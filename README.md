@@ -21,7 +21,9 @@ live "resets in Xh Ym" countdown for each.
 
 Polls Anthropic's authenticated usage endpoint every 60s for account-wide
 Claude usage (claude.ai plus Claude Code), using Claude Code's existing OAuth
-credentials from macOS Keychain. Legacy file-based credentials remain supported.
+credentials from macOS Keychain. Before reporting an expired login, the app asks
+the installed Claude CLI to renew its credentials and then retries once. Legacy
+file-based credentials remain supported.
 
 Codex usage and Claude fallback data come from:
 
@@ -47,7 +49,12 @@ claude auth status
 
 `auth status` must report `"loggedIn": true`. Usage Menu Bar reads Claude
 Code's OAuth credential from macOS Keychain and refreshes account usage within
-60 seconds. If macOS asks for Keychain access, choose **Always Allow**.
+60 seconds. The Claude CLI owns all OAuth renewal and Keychain writes. If macOS
+asks for Keychain access, choose **Always Allow**.
+
+If the refresh token is absent, revoked, or expired, silent renewal is
+impossible. The app keeps the latest snapshot and shows **Sign in to Claude**;
+clicking it opens `claude auth login --claudeai` in Terminal.
 
 When authentication or Anthropic is unavailable, the app keeps showing the
 latest local Claude snapshot and displays a warning below the quota cards.

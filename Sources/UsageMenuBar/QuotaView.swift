@@ -95,7 +95,7 @@ struct ProviderCard: View {
             if let pct = quota.weeklyPct, let resets = quota.weeklyResetsAt {
                 QuotaBar(label: "Weekly used", pct: pct, resetsAt: resets, now: now)
             }
-            if let staleness = quota.staleness, staleness > 3600 {
+            if let staleness = quota.staleness, staleness > 3600, quota.id == "codex" {
                 Text(stalenessText(hours: Int(staleness / 3600)))
                     .font(.caption2)
                     .foregroundStyle(.orange)
@@ -111,10 +111,7 @@ struct ProviderCard: View {
     }
 
     private func stalenessText(hours: Int) -> String {
-        if quota.id == "codex" {
-            return "quota snapshot \(hours)h old"
-        }
-        return "frozen · no \(quota.name) session in \(hours)h"
+        return "quota snapshot \(hours)h old"
     }
 }
 
@@ -146,10 +143,16 @@ struct QuotaView: View {
                 }
             }
 
-            if let error = store.lastError {
-                Text(error)
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
+            if let message = store.claudeState.message {
+                HStack(spacing: 8) {
+                    Text(message)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                    if store.claudeState.offersLogin {
+                        Button("Sign in to Claude") { store.signInToClaude() }
+                            .font(.caption2)
+                    }
+                }
             }
 
             Divider()

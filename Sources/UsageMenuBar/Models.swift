@@ -29,10 +29,39 @@ struct ClaudeAccountUsage: Decodable {
 struct ClaudeCredentials: Decodable {
     struct OAuth: Decodable {
         let accessToken: String
+        let refreshToken: String?
         let expiresAt: Double?
     }
 
     let claudeAiOauth: OAuth
+}
+
+enum ClaudeUsageState: Equatable {
+    case ready
+    case refreshing
+    case cliMissing
+    case loginRequired
+    case networkUnavailable
+    case requestFailed
+
+    var message: String? {
+        switch self {
+        case .ready, .refreshing:
+            return nil
+        case .cliMissing:
+            return "Claude CLI not found · showing latest snapshot"
+        case .loginRequired:
+            return "Claude login required · showing latest snapshot"
+        case .networkUnavailable:
+            return "Claude account usage unavailable offline · showing latest snapshot"
+        case .requestFailed:
+            return "Claude account usage request failed · showing latest snapshot"
+        }
+    }
+
+    var offersLogin: Bool {
+        self == .loginRequired
+    }
 }
 
 struct CodexLimits: Decodable {

@@ -1,57 +1,138 @@
-import Foundation
 import Combine
-import Security
+import Foundation
 
 @MainActor
 final class QuotaStore: ObservableObject {
     @Published var claude: ProviderQuota?
     @Published var codex: ProviderQuota?
-    @Published var lastError: String?
+    @Published var claudeState: ClaudeUsageState = .refreshing
 
-    // Prefer the multi-device merged snapshot (freshest across this Mac +
-    // any synced remote devices — see sync-claude-limits.sh); fall back to
-    // this device's own raw capture if the merge hasn't run yet.
     private let claudeMergedPath = NSString(string: "~/.claude/usage-dashboard/claude-rate-limits-merged.json").expandingTildeInPath
     private let claudeLocalPath = NSString(string: "~/.claude/usage-dashboard/claude-rate-limits.json").expandingTildeInPath
     private let codexPath = NSString(string: "~/.claude/usage-dashboard/codex-rate-limits.json").expandingTildeInPath
-    private let claudeCredentialsPath = NSString(string: "~/.claude/.credentials.json").expandingTildeInPath
-    private let claudeUsageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
-
+    private let dependencies: QuotaDependencies
     private var timer: Timer?
-    // Claude's captured_at has no fractional seconds; Codex's does. Try both.
+    private var refreshInProgress = false
+    private var hasAccountClaudeUsage = false
+
     private let isoFractional: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }()
     private let iso = ISO8601DateFormatter()
 
-    private func parseDate(_ s: String) -> Date? {
-        isoFractional.date(from: s) ?? iso.date(from: s)
-    }
-
-    init() {
-        refresh()
+    init(dependencies: QuotaDependencies = .live, startImmediately: Bool = true) {
+        self.dependencies = dependencies
+        refreshSnapshots()
+        guard startImmediately else { return }
         Task { await refreshClaudeAccountUsage() }
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.refresh()
+                self?.refreshSnapshots()
                 await self?.refreshClaudeAccountUsage()
             }
         }
     }
 
-    func refresh() {
-        claude = loadClaude()
+    func refreshSnapshots() {
+        if !hasAccountClaudeUsage { claude = loadClaudeSnapshot() }
         codex = loadCodex()
     }
 
-    private func loadClaude() -> ProviderQuota? {
+    func refreshClaudeAccountUsage() async {
+        guard !refreshInProgress else { return }
+        refreshInProgress = true
+        defer { refreshInProgress = false }
+        claudeState = .refreshing
+
+        guard let credentials = decodeCredentials() else {
+            await refreshCredentialsAndUsage()
+            return
+        }
+        if isExpired(credentials) {
+            await refreshCredentialsAndUsage()
+            return
+        }
+        await requestUsage(credentials: credentials, mayRefreshAfterUnauthorized: true)
+    }
+
+    func signInToClaude() {
+        do {
+            try dependencies.launchLogin()
+        } catch {
+            claudeState = .cliMissing
+        }
+    }
+
+    private func refreshCredentialsAndUsage() async {
+        switch await dependencies.refreshCLI() {
+        case .refreshed:
+            guard let credentials = decodeCredentials(), !isExpired(credentials) else {
+                claudeState = .loginRequired
+                return
+            }
+            await requestUsage(credentials: credentials, mayRefreshAfterUnauthorized: false)
+        case .missing:
+            claudeState = .cliMissing
+        case .loginRequired:
+            claudeState = .loginRequired
+        case .timedOut, .failed:
+            claudeState = .requestFailed
+        }
+    }
+
+    private func requestUsage(credentials: ClaudeCredentials, mayRefreshAfterUnauthorized: Bool) async {
+        do {
+            let response = try await dependencies.fetchUsage(credentials.claudeAiOauth.accessToken)
+            if response.statusCode == 401, mayRefreshAfterUnauthorized {
+                await refreshCredentialsAndUsage()
+                return
+            }
+            guard response.statusCode == 200,
+                  let usage = try? JSONDecoder().decode(ClaudeAccountUsage.self, from: response.data)
+            else {
+                claudeState = response.statusCode == 401 ? .loginRequired : .requestFailed
+                return
+            }
+            claude = ProviderQuota(
+                id: "claude",
+                name: "Claude",
+                fiveHourPct: usage.five_hour?.utilization,
+                fiveHourResetsAt: usage.five_hour.flatMap { parseDate($0.resets_at) },
+                weeklyPct: usage.seven_day?.utilization,
+                weeklyResetsAt: usage.seven_day.flatMap { parseDate($0.resets_at) },
+                staleness: 0,
+                sourceDevice: "Anthropic account"
+            )
+            hasAccountClaudeUsage = true
+            claudeState = .ready
+        } catch let error as URLError where error.code == .notConnectedToInternet || error.code == .networkConnectionLost {
+            claudeState = .networkUnavailable
+        } catch {
+            claudeState = .requestFailed
+        }
+    }
+
+    private func decodeCredentials() -> ClaudeCredentials? {
+        dependencies.readCredentials().flatMap { try? JSONDecoder().decode(ClaudeCredentials.self, from: $0) }
+    }
+
+    private func isExpired(_ credentials: ClaudeCredentials) -> Bool {
+        guard let expiresAt = credentials.claudeAiOauth.expiresAt else { return false }
+        return expiresAt <= dependencies.now().timeIntervalSince1970 * 1000
+    }
+
+    private func parseDate(_ string: String) -> Date? {
+        isoFractional.date(from: string) ?? iso.date(from: string)
+    }
+
+    private func loadClaudeSnapshot() -> ProviderQuota? {
         let path = FileManager.default.fileExists(atPath: claudeMergedPath) ? claudeMergedPath : claudeLocalPath
-        guard let data = FileManager.default.contents(atPath: path) else { return nil }
-        guard let decoded = try? JSONDecoder().decode(ClaudeLimits.self, from: data) else { return nil }
+        guard let data = FileManager.default.contents(atPath: path),
+              let decoded = try? JSONDecoder().decode(ClaudeLimits.self, from: data)
+        else { return nil }
         let capturedAt = parseDate(decoded.captured_at)
-        let staleness = capturedAt.map { Date().timeIntervalSince($0) }
         return ProviderQuota(
             id: "claude",
             name: "Claude",
@@ -59,75 +140,16 @@ final class QuotaStore: ObservableObject {
             fiveHourResetsAt: Date(timeIntervalSince1970: decoded.five_hour.resets_at),
             weeklyPct: decoded.seven_day.used_percentage,
             weeklyResetsAt: Date(timeIntervalSince1970: decoded.seven_day.resets_at),
-            staleness: staleness,
+            staleness: capturedAt.map { dependencies.now().timeIntervalSince($0) },
             sourceDevice: decoded.source_device
         )
     }
 
-    private func refreshClaudeAccountUsage() async {
-        guard let credentialsData = loadClaudeCredentialsData(),
-              let credentials = try? JSONDecoder().decode(ClaudeCredentials.self, from: credentialsData)
-        else {
-            lastError = "Account usage unavailable · run `claude auth login`"
-            return
-        }
-        if let expiresAt = credentials.claudeAiOauth.expiresAt,
-           expiresAt <= Date().timeIntervalSince1970 * 1000 {
-            lastError = "Claude login expired · run `claude auth login`"
-            return
-        }
-
-        var request = URLRequest(url: claudeUsageURL)
-        request.timeoutInterval = 10
-        request.setValue("Bearer \(credentials.claudeAiOauth.accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-        request.setValue("usage-menubar/1.0", forHTTPHeaderField: "User-Agent")
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                lastError = "Claude account usage request failed"
-                return
-            }
-            let usage = try JSONDecoder().decode(ClaudeAccountUsage.self, from: data)
-            let fiveHourReset = usage.five_hour.flatMap { parseDate($0.resets_at) }
-            let weeklyReset = usage.seven_day.flatMap { parseDate($0.resets_at) }
-            claude = ProviderQuota(
-                id: "claude",
-                name: "Claude",
-                fiveHourPct: usage.five_hour?.utilization,
-                fiveHourResetsAt: fiveHourReset,
-                weeklyPct: usage.seven_day?.utilization,
-                weeklyResetsAt: weeklyReset,
-                staleness: 0,
-                sourceDevice: "Anthropic account"
-            )
-            lastError = nil
-        } catch {
-            lastError = "Claude account usage unavailable: \(error.localizedDescription)"
-        }
-    }
-
-    private func loadClaudeCredentialsData() -> Data? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "Claude Code-credentials",
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecReturnData as String: true
-        ]
-        var item: CFTypeRef?
-        if SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-           let data = item as? Data {
-            return data
-        }
-        return FileManager.default.contents(atPath: claudeCredentialsPath)
-    }
-
     private func loadCodex() -> ProviderQuota? {
-        guard let data = FileManager.default.contents(atPath: codexPath) else { return nil }
-        guard let decoded = try? JSONDecoder().decode(CodexLimits.self, from: data) else { return nil }
+        guard let data = FileManager.default.contents(atPath: codexPath),
+              let decoded = try? JSONDecoder().decode(CodexLimits.self, from: data)
+        else { return nil }
         let capturedAt = parseDate(decoded.captured_at)
-        let staleness = capturedAt.map { Date().timeIntervalSince($0) }
         let fiveHour = decoded.fiveHourWindow
         let weekly = decoded.weeklyWindow
         return ProviderQuota(
@@ -137,7 +159,7 @@ final class QuotaStore: ObservableObject {
             fiveHourResetsAt: fiveHour.map { Date(timeIntervalSince1970: $0.resets_at) },
             weeklyPct: weekly?.used_percent,
             weeklyResetsAt: weekly.map { Date(timeIntervalSince1970: $0.resets_at) },
-            staleness: staleness,
+            staleness: capturedAt.map { dependencies.now().timeIntervalSince($0) },
             sourceDevice: nil
         )
     }
