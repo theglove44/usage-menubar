@@ -1,31 +1,34 @@
 # usage-menubar
 
-Native macOS menu bar app (SwiftUI `MenuBarExtra`) showing live Codex + Claude
-Code rate-limit quotas. Built as a self-hosted replacement for
-`shanggqm/codexU` — same idea, but fully local, no third-party binary, no
-network calls of any kind.
+Native macOS menu bar app (SwiftUI `MenuBarExtra`) showing live Codex +
+account-wide Claude rate-limit quotas. Built as a self-hosted replacement for
+`shanggqm/codexU` — same idea, no third-party binary.
 
 ## How it works
 
-Reads two JSON snapshot files directly off disk, polling every 20s:
+Polls Anthropic's OAuth usage endpoint every 60s using Claude Code credentials
+from macOS Keychain. This account-wide reading includes both claude.ai and
+Claude Code usage. Reads local JSON snapshots for Codex and Claude fallback:
 - `~/.claude/usage-dashboard/claude-rate-limits.json`
+- `~/.claude/usage-dashboard/claude-rate-limits-merged.json`
 - `~/.claude/usage-dashboard/codex-rate-limits.json`
 
-Both files are written by the companion dashboard project at
+These files are written by the companion dashboard project at
 `~/.claude/usage-dashboard/` ([theglove44/usage-dashboard](https://github.com/theglove44/usage-dashboard),
 own git repo, separate from this one) — statusline hook writes the Claude one on every
 render; `codex-live-limits.mjs` / `parse-codex-logs.mjs` write the Codex one).
-This app is a pure reader — it never talks to Codex, Claude, or any network
-endpoint. If those JSON files are missing, the relevant provider card just
-shows "no data yet".
+Only the Claude account quota request uses network access, and it talks directly
+to Anthropic. If local files are missing, the relevant provider card shows
+"no data yet". If Claude authentication fails, local Claude data stays visible
+with an authentication warning.
 
 ## Layout
 
 - `Package.swift` — Swift Package, macOS 14+, single executable target.
 - `Sources/UsageMenuBar/Models.swift` — Codable structs matching the JSON
   snapshot shapes, plus a unified `ProviderQuota` the view renders.
-- `Sources/UsageMenuBar/QuotaStore.swift` — `ObservableObject`, file-based
-  polling (`Timer`, 20s), no network APIs used anywhere.
+- `Sources/UsageMenuBar/QuotaStore.swift` — `ObservableObject`, Anthropic quota
+  polling (`Timer`, 60s), macOS Keychain access, and local snapshot fallback.
 - `Sources/UsageMenuBar/QuotaView.swift` — the dropdown UI (progress bars,
   reset countdowns) and the menu bar label text.
 - `Sources/UsageMenuBar/UsageMenuBarApp.swift` — `@main` entry, sets

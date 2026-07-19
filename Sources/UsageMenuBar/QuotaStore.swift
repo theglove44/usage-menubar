@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import Security
 
 @MainActor
 final class QuotaStore: ObservableObject {
@@ -13,6 +14,8 @@ final class QuotaStore: ObservableObject {
     private let claudeMergedPath = NSString(string: "~/.claude/usage-dashboard/claude-rate-limits-merged.json").expandingTildeInPath
     private let claudeLocalPath = NSString(string: "~/.claude/usage-dashboard/claude-rate-limits.json").expandingTildeInPath
     private let codexPath = NSString(string: "~/.claude/usage-dashboard/codex-rate-limits.json").expandingTildeInPath
+    private let claudeCredentialsPath = NSString(string: "~/.claude/.credentials.json").expandingTildeInPath
+    private let claudeUsageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
     private var timer: Timer?
     // Claude's captured_at has no fractional seconds; Codex's does. Try both.
@@ -29,10 +32,12 @@ final class QuotaStore: ObservableObject {
 
     init() {
         refresh()
-        // Local file read only — no network. 20s is plenty since the source
-        // files themselves only change when Codex/Claude sessions are active.
-        timer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+        Task { await refreshClaudeAccountUsage() }
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.refresh()
+                await self?.refreshClaudeAccountUsage()
+            }
         }
     }
 
@@ -49,7 +54,7 @@ final class QuotaStore: ObservableObject {
         let staleness = capturedAt.map { Date().timeIntervalSince($0) }
         return ProviderQuota(
             id: "claude",
-            name: "Claude Code",
+            name: "Claude",
             fiveHourPct: decoded.five_hour.used_percentage,
             fiveHourResetsAt: Date(timeIntervalSince1970: decoded.five_hour.resets_at),
             weeklyPct: decoded.seven_day.used_percentage,
@@ -57,6 +62,65 @@ final class QuotaStore: ObservableObject {
             staleness: staleness,
             sourceDevice: decoded.source_device
         )
+    }
+
+    private func refreshClaudeAccountUsage() async {
+        guard let credentialsData = loadClaudeCredentialsData(),
+              let credentials = try? JSONDecoder().decode(ClaudeCredentials.self, from: credentialsData)
+        else {
+            lastError = "Account usage unavailable · run `claude auth login`"
+            return
+        }
+        if let expiresAt = credentials.claudeAiOauth.expiresAt,
+           expiresAt <= Date().timeIntervalSince1970 * 1000 {
+            lastError = "Claude login expired · run `claude auth login`"
+            return
+        }
+
+        var request = URLRequest(url: claudeUsageURL)
+        request.timeoutInterval = 10
+        request.setValue("Bearer \(credentials.claudeAiOauth.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
+        request.setValue("usage-menubar/1.0", forHTTPHeaderField: "User-Agent")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                lastError = "Claude account usage request failed"
+                return
+            }
+            let usage = try JSONDecoder().decode(ClaudeAccountUsage.self, from: data)
+            let fiveHourReset = usage.five_hour.flatMap { parseDate($0.resets_at) }
+            let weeklyReset = usage.seven_day.flatMap { parseDate($0.resets_at) }
+            claude = ProviderQuota(
+                id: "claude",
+                name: "Claude",
+                fiveHourPct: usage.five_hour?.utilization,
+                fiveHourResetsAt: fiveHourReset,
+                weeklyPct: usage.seven_day?.utilization,
+                weeklyResetsAt: weeklyReset,
+                staleness: 0,
+                sourceDevice: "Anthropic account"
+            )
+            lastError = nil
+        } catch {
+            lastError = "Claude account usage unavailable: \(error.localizedDescription)"
+        }
+    }
+
+    private func loadClaudeCredentialsData() -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "Claude Code-credentials",
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecReturnData as String: true
+        ]
+        var item: CFTypeRef?
+        if SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+           let data = item as? Data {
+            return data
+        }
+        return FileManager.default.contents(atPath: claudeCredentialsPath)
     }
 
     private func loadCodex() -> ProviderQuota? {

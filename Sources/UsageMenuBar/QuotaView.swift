@@ -142,14 +142,20 @@ struct QuotaView: View {
                 if let claude = store.claude {
                     ProviderCard(quota: claude, now: now)
                 } else {
-                    emptyCard("Claude Code", "no data yet")
+                    emptyCard("Claude", "no data yet")
                 }
+            }
+
+            if let error = store.lastError {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
             }
 
             Divider()
 
-            Button("Open full dashboard") {
-                if let url = URL(string: "http://localhost:8484") {
+            Button("Open Claude usage") {
+                if let url = URL(string: "https://claude.ai/settings/usage") {
                     NSWorkspace.shared.open(url)
                 }
             }
@@ -191,6 +197,6 @@ struct MenuBarLabel: View {
     private func labelText(codex: Double?, claude: Double?) -> String {
         let c = codex.map { "\(Int($0.rounded()))%" } ?? "--"
         let cl = claude.map { "\(Int($0.rounded()))%" } ?? "--"
-        return "C \(c)u · CC \(cl)u"
+        return "C \(c)u · Cl \(cl)u"
     }
 }

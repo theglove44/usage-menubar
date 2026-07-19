@@ -16,6 +16,25 @@ struct ClaudeLimits: Decodable {
     let source_device: String?
 }
 
+struct ClaudeAccountUsage: Decodable {
+    struct Window: Decodable {
+        let utilization: Double
+        let resets_at: String
+    }
+
+    let five_hour: Window?
+    let seven_day: Window?
+}
+
+struct ClaudeCredentials: Decodable {
+    struct OAuth: Decodable {
+        let accessToken: String
+        let expiresAt: Double?
+    }
+
+    let claudeAiOauth: OAuth
+}
+
 struct CodexLimits: Decodable {
     struct Window: Decodable {
         let used_percent: Double

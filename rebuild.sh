@@ -4,12 +4,17 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP="$HOME/Applications/UsageMenuBar.app"
+CACHE_ROOT="${TMPDIR:-/tmp}/usage-menubar-build-cache"
+
+mkdir -p "$CACHE_ROOT/clang" "$CACHE_ROOT/swift"
+export CLANG_MODULE_CACHE_PATH="$CACHE_ROOT/clang"
+export SWIFTPM_MODULECACHE_OVERRIDE="$CACHE_ROOT/swift"
 
 cd "$DIR"
 echo "Building..."
-swift build -c release
+swift build --disable-sandbox -c release
 
-BIN="$(swift build -c release --show-bin-path)/UsageMenuBar"
+BIN="$(swift build --disable-sandbox -c release --show-bin-path)/UsageMenuBar"
 
 echo "Stopping running instance (if any)..."
 pkill -x UsageMenuBar 2>/dev/null || true
