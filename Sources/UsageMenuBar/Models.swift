@@ -41,6 +41,7 @@ enum ClaudeUsageState: Equatable {
     case refreshing
     case cliMissing
     case loginRequired
+    case rateLimited
     case networkUnavailable
     case requestFailed
 
@@ -52,6 +53,8 @@ enum ClaudeUsageState: Equatable {
             return "Claude CLI not found · showing latest snapshot"
         case .loginRequired:
             return "Claude login required · showing latest snapshot"
+        case .rateLimited:
+            return "Claude account polling rate-limited · showing latest snapshot"
         case .networkUnavailable:
             return "Claude account usage unavailable offline · showing latest snapshot"
         case .requestFailed:

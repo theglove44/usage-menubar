@@ -186,6 +186,60 @@ final class CodexLimitsTests: XCTestCase {
         XCTAssertEqual(launchCount, 1)
     }
 
+    @MainActor
+    func testSuccessfulAccountRequestBacksOffForFiveMinutes() async {
+        var fetchCount = 0
+        var now = Date(timeIntervalSince1970: 1_000_000_000)
+        let dependencies = QuotaDependencies(
+            readCredentials: { self.credentials(expiresAt: 2_000_000_000_000) },
+            refreshCLI: { .refreshed },
+            fetchUsage: { _ in
+                fetchCount += 1
+                return ClaudeUsageHTTPResponse(statusCode: 200, data: self.accountUsage())
+            },
+            now: { now },
+            launchLogin: {}
+        )
+        let store = QuotaStore(dependencies: dependencies, startImmediately: false)
+
+        await store.refreshClaudeAccountUsage()
+        now = now.addingTimeInterval(60)
+        await store.refreshClaudeAccountUsage()
+        XCTAssertEqual(fetchCount, 1)
+
+        now = now.addingTimeInterval(240)
+        await store.refreshClaudeAccountUsage()
+        XCTAssertEqual(fetchCount, 2)
+    }
+
+    @MainActor
+    func testRateLimitUsesRetryAfterAndShowsSnapshot() async {
+        var fetchCount = 0
+        var now = Date(timeIntervalSince1970: 1_000_000_000)
+        let dependencies = QuotaDependencies(
+            readCredentials: { self.credentials(expiresAt: 2_000_000_000_000) },
+            refreshCLI: { .refreshed },
+            fetchUsage: { _ in
+                fetchCount += 1
+                return ClaudeUsageHTTPResponse(statusCode: 429, data: Data(), retryAfter: 600)
+            },
+            now: { now },
+            launchLogin: {}
+        )
+        let store = QuotaStore(dependencies: dependencies, startImmediately: false)
+
+        await store.refreshClaudeAccountUsage()
+        XCTAssertEqual(store.claudeState, .rateLimited)
+        XCTAssertNotNil(store.claude)
+
+        now = now.addingTimeInterval(599)
+        await store.refreshClaudeAccountUsage()
+        XCTAssertEqual(fetchCount, 1)
+        now = now.addingTimeInterval(1)
+        await store.refreshClaudeAccountUsage()
+        XCTAssertEqual(fetchCount, 2)
+    }
+
     private func credentials(expiresAt: Double, refreshToken: String? = "refresh") -> Data {
         let refreshField = refreshToken.map { "\"refreshToken\": \"\($0)\"," } ?? ""
         return Data("""

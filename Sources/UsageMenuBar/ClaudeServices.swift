@@ -5,6 +5,13 @@ import Security
 struct ClaudeUsageHTTPResponse {
     let statusCode: Int
     let data: Data
+    let retryAfter: TimeInterval?
+
+    init(statusCode: Int, data: Data, retryAfter: TimeInterval? = nil) {
+        self.statusCode = statusCode
+        self.data = data
+        self.retryAfter = retryAfter
+    }
 }
 
 enum ClaudeCLIRefreshResult: Equatable {
@@ -60,8 +67,13 @@ enum ClaudeUsageClient {
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         request.setValue("usage-menubar/1.0", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
-        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-        return ClaudeUsageHTTPResponse(statusCode: statusCode, data: data)
+        let http = response as? HTTPURLResponse
+        let retryAfter = http?.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init)
+        return ClaudeUsageHTTPResponse(
+            statusCode: http?.statusCode ?? 0,
+            data: data,
+            retryAfter: retryAfter
+        )
     }
 }
 

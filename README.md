@@ -19,11 +19,13 @@ live "resets in Xh Ym" countdown for each.
 
 ## How it works
 
-Polls Anthropic's authenticated usage endpoint every 60s for account-wide
+Polls Anthropic's authenticated usage endpoint every five minutes for account-wide
 Claude usage (claude.ai plus Claude Code), using Claude Code's existing OAuth
 credentials from macOS Keychain. Before reporting an expired login, the app asks
 the installed Claude CLI to renew its credentials and then retries once. Legacy
-file-based credentials remain supported.
+file-based credentials remain supported. Local snapshots are still checked every
+60 seconds and take over when newer than cached account data. HTTP 429 responses
+honour Anthropic's `Retry-After` value with a five-minute minimum backoff.
 
 Codex usage and Claude fallback data come from:
 

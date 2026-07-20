@@ -14,6 +14,9 @@ final class QuotaStore: ObservableObject {
     private var timer: Timer?
     private var refreshInProgress = false
     private var hasAccountClaudeUsage = false
+    private var lastAccountSuccess: Date?
+    private var nextAccountRefresh = Date.distantPast
+    private let accountRefreshInterval: TimeInterval = 5 * 60
 
     private let isoFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -36,12 +39,16 @@ final class QuotaStore: ObservableObject {
     }
 
     func refreshSnapshots() {
-        if !hasAccountClaudeUsage { claude = loadClaudeSnapshot() }
+        if let snapshot = loadClaudeSnapshot(),
+           !hasAccountClaudeUsage || snapshot.capturedAt.map({ $0 > (lastAccountSuccess ?? .distantPast) }) == true {
+            claude = snapshot.quota
+        }
         codex = loadCodex()
     }
 
     func refreshClaudeAccountUsage() async {
         guard !refreshInProgress else { return }
+        guard dependencies.now() >= nextAccountRefresh else { return }
         refreshInProgress = true
         defer { refreshInProgress = false }
         claudeState = .refreshing
@@ -89,6 +96,14 @@ final class QuotaStore: ObservableObject {
                 await refreshCredentialsAndUsage()
                 return
             }
+            if response.statusCode == 429 {
+                nextAccountRefresh = dependencies.now().addingTimeInterval(
+                    max(response.retryAfter ?? accountRefreshInterval, accountRefreshInterval)
+                )
+                refreshSnapshots()
+                claudeState = .rateLimited
+                return
+            }
             guard response.statusCode == 200,
                   let usage = try? JSONDecoder().decode(ClaudeAccountUsage.self, from: response.data)
             else {
@@ -106,6 +121,8 @@ final class QuotaStore: ObservableObject {
                 sourceDevice: "Anthropic account"
             )
             hasAccountClaudeUsage = true
+            lastAccountSuccess = dependencies.now()
+            nextAccountRefresh = dependencies.now().addingTimeInterval(accountRefreshInterval)
             claudeState = .ready
         } catch let error as URLError where error.code == .notConnectedToInternet || error.code == .networkConnectionLost {
             claudeState = .networkUnavailable
@@ -127,13 +144,13 @@ final class QuotaStore: ObservableObject {
         isoFractional.date(from: string) ?? iso.date(from: string)
     }
 
-    private func loadClaudeSnapshot() -> ProviderQuota? {
+    private func loadClaudeSnapshot() -> (quota: ProviderQuota, capturedAt: Date?)? {
         let path = FileManager.default.fileExists(atPath: claudeMergedPath) ? claudeMergedPath : claudeLocalPath
         guard let data = FileManager.default.contents(atPath: path),
               let decoded = try? JSONDecoder().decode(ClaudeLimits.self, from: data)
         else { return nil }
         let capturedAt = parseDate(decoded.captured_at)
-        return ProviderQuota(
+        let quota = ProviderQuota(
             id: "claude",
             name: "Claude",
             fiveHourPct: decoded.five_hour.used_percentage,
@@ -143,6 +160,7 @@ final class QuotaStore: ObservableObject {
             staleness: capturedAt.map { dependencies.now().timeIntervalSince($0) },
             sourceDevice: decoded.source_device
         )
+        return (quota, capturedAt)
     }
 
     private func loadCodex() -> ProviderQuota? {
