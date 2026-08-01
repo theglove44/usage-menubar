@@ -8,8 +8,6 @@ from Anthropic; Codex and fallback data come from local snapshot files.
 
 ![Usage Quotas dropdown](screenshot.png)
 
-![Provider quota bars](docs/images/usage-bars.png)
-
 ## What it does
 
 Menu bar label shows both providers' 5-hour usage at a glance. Click it for a
