@@ -7,7 +7,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "UsageMenuBar",
-            path: "Sources/UsageMenuBar"
+            path: "Sources/UsageMenuBar",
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "UsageMenuBarTests",

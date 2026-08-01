@@ -8,14 +8,14 @@ from Anthropic; Codex and fallback data come from local snapshot files.
 
 ![Usage Quotas dropdown](screenshot.png)
 
-![Usage bar heat states](docs/images/usage-bars.png)
+![Provider quota bars](docs/images/usage-bars.png)
 
 ## What it does
 
 Menu bar label shows both providers' 5-hour usage at a glance. Click it for a
 dropdown with 5-hour and weekly quota bars. Each bar heats from yellow to red
-as usage rises, with a moving fire marker showing the exact percentage, plus a
-live "resets in Xh Ym" countdown for each.
+as usage rises, with a moving provider logo showing the exact percentage, plus
+a live "resets in Xh Ym" countdown for each.
 
 ## How it works
 

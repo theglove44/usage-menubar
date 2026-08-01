@@ -28,6 +28,7 @@ struct QuotaBar: View {
     let pct: Double
     let resetsAt: Date
     let now: Date
+    let brand: ProviderBrand
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -45,10 +46,10 @@ struct QuotaBar: View {
                 let clampedPct = min(max(pct, 0), 100)
                 let progress = clampedPct / 100
                 let fillWidth = geo.size.width * progress
-                let flameSize = 14.0
-                let flameX = min(
-                    max(fillWidth, flameSize / 2),
-                    geo.size.width - flameSize / 2
+                let logoSize = 14.0
+                let logoX = min(
+                    max(fillWidth, logoSize / 2),
+                    geo.size.width - logoSize / 2
                 )
 
                 ZStack(alignment: .leading) {
@@ -58,10 +59,9 @@ struct QuotaBar: View {
                     RoundedRectangle(cornerRadius: 3)
                         .fill(barColor(clampedPct))
                         .frame(width: max(2, fillWidth), height: 7)
-                    Text("🔥")
-                        .font(.system(size: flameSize))
-                        .frame(width: flameSize, height: flameSize)
-                        .offset(x: flameX - flameSize / 2)
+                    ProviderLogo(brand: brand)
+                        .frame(width: logoSize, height: logoSize)
+                        .offset(x: logoX - logoSize / 2)
                         .shadow(
                             color: barColor(clampedPct).opacity(progress),
                             radius: progress * 3
@@ -85,15 +85,31 @@ struct ProviderCard: View {
     let quota: ProviderQuota
     let now: Date
 
+    private var brand: ProviderBrand {
+        ProviderBrand(rawValue: quota.id) ?? .codex
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(quota.name)
                 .font(.subheadline.bold())
             if let pct = quota.fiveHourPct, let resets = quota.fiveHourResetsAt {
-                QuotaBar(label: "5-hour used", pct: pct, resetsAt: resets, now: now)
+                QuotaBar(
+                    label: "5-hour used",
+                    pct: pct,
+                    resetsAt: resets,
+                    now: now,
+                    brand: brand
+                )
             }
             if let pct = quota.weeklyPct, let resets = quota.weeklyResetsAt {
-                QuotaBar(label: "Weekly used", pct: pct, resetsAt: resets, now: now)
+                QuotaBar(
+                    label: "Weekly used",
+                    pct: pct,
+                    resetsAt: resets,
+                    now: now,
+                    brand: brand
+                )
             }
             if let staleness = quota.staleness, staleness > 3600, quota.id == "codex" {
                 Text(stalenessText(hours: Int(staleness / 3600)))
