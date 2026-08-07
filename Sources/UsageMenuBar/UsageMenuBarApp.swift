@@ -4,6 +4,9 @@ import AppKit
 @main
 struct UsageMenuBarApp: App {
     @StateObject private var store = QuotaStore()
+    @StateObject private var sessionStore = SessionActivityStore(
+        provider: LocalSessionRunwayActivityProvider()
+    )
 
     init() {
         // No Dock icon, no Cmd-Tab entry — pure menu bar utility.
@@ -12,9 +15,9 @@ struct UsageMenuBarApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            QuotaView(store: store)
+            QuotaView(store: store, sessionStore: sessionStore)
         } label: {
-            MenuBarLabel(store: store)
+            MenuBarLabel(store: store, sessionStore: sessionStore)
         }
         .menuBarExtraStyle(.window)
     }

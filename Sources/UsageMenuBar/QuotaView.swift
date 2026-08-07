@@ -133,6 +133,7 @@ struct ProviderCard: View {
 
 struct QuotaView: View {
     @ObservedObject var store: QuotaStore
+    @ObservedObject var sessionStore: SessionActivityStore
     @State private var now = Date()
 
     private let clock = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
@@ -171,6 +172,8 @@ struct QuotaView: View {
                 }
             }
 
+            SessionActivitySection(store: sessionStore, now: now)
+
             Divider()
 
             Button("Open Claude usage") {
@@ -189,7 +192,7 @@ struct QuotaView: View {
             .foregroundStyle(.secondary)
         }
         .padding(12)
-        .frame(width: 320)
+        .frame(width: 350)
         .onReceive(clock) { t in now = t }
     }
 
@@ -206,16 +209,17 @@ struct QuotaView: View {
 
 struct MenuBarLabel: View {
     @ObservedObject var store: QuotaStore
+    @ObservedObject var sessionStore: SessionActivityStore
 
     var body: some View {
         let codexPct = store.codex.flatMap { $0.fiveHourPct ?? $0.weeklyPct }
         let claudePct = store.claude?.fiveHourPct
-        Text(labelText(codex: codexPct, claude: claudePct))
+        Text(menuBarLabelText(codex: codexPct, claude: claudePct, sessions: sessionStore.snapshot))
     }
+}
 
-    private func labelText(codex: Double?, claude: Double?) -> String {
-        let c = codex.map { "\(Int($0.rounded()))%" } ?? "--"
-        let cl = claude.map { "\(Int($0.rounded()))%" } ?? "--"
-        return "C \(c)u · Cl \(cl)u"
-    }
+func menuBarLabelText(codex: Double?, claude: Double?, sessions: SessionActivitySnapshot) -> String {
+    let c = codex.map { "\(Int($0.rounded()))%" } ?? "--"
+    let cl = claude.map { "\(Int($0.rounded()))%" } ?? "--"
+    return "C \(c)u · Cl \(cl)u · S \(sessions.compactCount)"
 }
