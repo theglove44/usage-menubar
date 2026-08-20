@@ -1,6 +1,13 @@
 import Foundation
 import SwiftUI
 
+// Turns the raw list of discovered sessions into what the dropdown shows: which rows
+// appear and in what order, how each is titled, and the wording of every age and
+// count. Presentation only - discovery and burn-rate maths happen elsewhere.
+//
+// The sort is deliberate: active sessions first, then waiting, then the rest, so the
+// four visible rows are the four you are most likely to care about.
+
 let sessionRunwayDefaultVisibleRows = 4
 
 struct SessionRunwayPresentation: Equatable {
@@ -51,6 +58,8 @@ struct SessionRunwayPresentation: Equatable {
     }
 }
 
+// The single entry point the view calls: filters, sorts and trims the session list
+// to the handful of rows that fit, and reports how many were left out.
 func sessionRunwayPresentation(
     for snapshot: SessionActivitySnapshot,
     maxVisibleRows: Int = sessionRunwayDefaultVisibleRows

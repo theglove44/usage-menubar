@@ -1,6 +1,18 @@
 import Combine
 import Foundation
 
+// The menu bar's source of numbers: how much of your Claude and Codex allowance is
+// used, and when it resets.
+//
+// Two sources feed it. Snapshot files written by the usage dashboard under
+// ~/.claude/usage-dashboard are read every 60 seconds and cost nothing. Claude's own
+// account API is called at most every 5 minutes, because it is rate limited and will
+// push back if asked more often. Live API figures win over the snapshot when both
+// are present, which is what hasAccountClaudeUsage and lastAccountSuccess track.
+//
+// If this file stops working the menu shows stale or empty numbers - it never blocks
+// the app.
+
 @MainActor
 final class QuotaStore: ObservableObject {
     @Published var claude: ProviderQuota?
@@ -46,6 +58,8 @@ final class QuotaStore: ObservableObject {
         codex = loadCodex()
     }
 
+    // Asks Claude's API for current usage, at most once per refresh interval, skipping
+    // entirely if a previous attempt is still running.
     func refreshClaudeAccountUsage() async {
         guard !refreshInProgress else { return }
         guard dependencies.now() >= nextAccountRefresh else { return }
@@ -89,6 +103,10 @@ final class QuotaStore: ObservableObject {
         }
     }
 
+    // Handles the three answers the API gives besides success: 401 means the saved
+    // credentials expired, so refresh them once and retry; 429 means slow down, so back
+    // off until the time it names; anything else is reported as a failed request rather
+    // than being silently ignored.
     private func requestUsage(credentials: ClaudeCredentials, mayRefreshAfterUnauthorized: Bool) async {
         do {
             let response = try await dependencies.fetchUsage(credentials.claudeAiOauth.accessToken)

@@ -2,6 +2,14 @@ import AppKit
 import Foundation
 import Security
 
+// The parts that talk to the outside world on Claude's behalf: reading the OAuth
+// credentials Claude Code stores in the macOS Keychain, calling the usage API,
+// re-running `claude setup-token` when those credentials have expired, and opening a
+// login window when they cannot be recovered.
+//
+// QuotaDependencies is the reason this is testable. Every outside call is reached
+// through it, so tests substitute fakes and never touch the Keychain or the network.
+
 struct ClaudeUsageHTTPResponse {
     let statusCode: Int
     let data: Data

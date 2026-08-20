@@ -1,5 +1,12 @@
 import SwiftUI
 
+// Everything you actually see in the dropdown: the coloured usage bars, each
+// provider's card, and the reset countdowns. Display only - it holds no data of its
+// own and calculates nothing beyond formatting, reading from QuotaStore and
+// SessionActivityStore.
+
+// Green through amber to red as the bar fills. Driven by a single hue calculation
+// rather than fixed thresholds, so the colour shifts smoothly instead of jumping.
 func barColor(_ pct: Double) -> Color {
     let progress = min(max(pct, 0), 100) / 100
     return Color(
