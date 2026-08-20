@@ -75,6 +75,33 @@ struct SessionRunwayBurn: Equatable, Sendable {
         observedTokenDelta: nil,
         observationWindow: nil
     )
+
+    // The two measured outcomes, alongside the constants above. The scanner reaches
+    // each of them from two different paths (cumulative totals and incremental
+    // records), so the shape lives here rather than being spelled out four times.
+    static func noRecentBurn(observationWindow: TimeInterval) -> SessionRunwayBurn {
+        SessionRunwayBurn(
+            state: .noRecentBurn,
+            confidence: .high,
+            observedTokensPerHour: nil,
+            shareOfObservedProviderBurn: nil,
+            observedTokenDelta: 0,
+            observationWindow: observationWindow
+        )
+    }
+
+    static func observed(deltaTokens: Int64, interval: TimeInterval) -> SessionRunwayBurn {
+        SessionRunwayBurn(
+            state: .observed,
+            confidence: .high,
+            observedTokensPerHour: SessionRunwayBurnMath.tokensPerHour(
+                deltaTokens: deltaTokens, interval: interval
+            ),
+            shareOfObservedProviderBurn: nil,
+            observedTokenDelta: deltaTokens,
+            observationWindow: interval
+        )
+    }
 }
 
 struct SessionRunwayRow: Identifiable, Equatable, Sendable {

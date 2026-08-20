@@ -39,26 +39,12 @@ struct SessionRunwayBurnAccumulator: Sendable {
             lastObservationAt = now
             guard delta > 0, interval > 0 else {
                 return SessionRunwayBurnMeasurement(
-                    burn: SessionRunwayBurn(
-                        state: .noRecentBurn,
-                        confidence: .high,
-                        observedTokensPerHour: nil,
-                        shareOfObservedProviderBurn: nil,
-                        observedTokenDelta: 0,
-                        observationWindow: interval
-                    ),
+                    burn: .noRecentBurn(observationWindow: interval),
                     deltaTokens: 0
                 )
             }
             return SessionRunwayBurnMeasurement(
-                burn: SessionRunwayBurn(
-                    state: .observed,
-                    confidence: .high,
-                    observedTokensPerHour: SessionRunwayBurnMath.tokensPerHour(deltaTokens: delta, interval: interval),
-                    shareOfObservedProviderBurn: nil,
-                    observedTokenDelta: delta,
-                    observationWindow: interval
-                ),
+                burn: .observed(deltaTokens: delta, interval: interval),
                 deltaTokens: delta
             )
         }
@@ -85,26 +71,12 @@ struct SessionRunwayBurnAccumulator: Sendable {
         lastObservationAt = now
         guard delta > 0, interval > 0 else {
             return SessionRunwayBurnMeasurement(
-                burn: SessionRunwayBurn(
-                    state: .noRecentBurn,
-                    confidence: .high,
-                    observedTokensPerHour: nil,
-                    shareOfObservedProviderBurn: nil,
-                    observedTokenDelta: 0,
-                    observationWindow: interval
-                ),
+                burn: .noRecentBurn(observationWindow: interval),
                 deltaTokens: 0
             )
         }
         return SessionRunwayBurnMeasurement(
-            burn: SessionRunwayBurn(
-                state: .observed,
-                confidence: .high,
-                observedTokensPerHour: SessionRunwayBurnMath.tokensPerHour(deltaTokens: delta, interval: interval),
-                shareOfObservedProviderBurn: nil,
-                observedTokenDelta: delta,
-                observationWindow: interval
-            ),
+            burn: .observed(deltaTokens: delta, interval: interval),
             deltaTokens: delta
         )
     }
