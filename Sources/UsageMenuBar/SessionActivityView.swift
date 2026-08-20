@@ -124,47 +124,42 @@ func sessionRunwayProjectText(for session: MenuBarSession, now: Date) -> String 
     return title == project ? activity : "\(project) · \(activity)"
 }
 
-func formatLastActivity(_ date: Date?, now: Date) -> String {
-    guard let date else { return "last activity unknown" }
+// One piece of relative-age arithmetic, three sets of words. The wording is not
+// consistent between callers and must not be made so: the snapshot line reads
+// "last update unknown" but "updated 2m ago", and the dropdown says a bare
+// "just now". Each caller supplies its own phrasing; the maths lives here only.
+private func relativeAge(_ date: Date?, now: Date,
+                         unknown: String, future: String,
+                         justNow: String, prefix: String) -> String {
+    guard let date else { return unknown }
     let interval = now.timeIntervalSince(date)
-    if interval < 0 { return "last activity in future" }
-    if interval < 60 { return "just now" }
+    if interval < 0 { return future }
+    if interval < 60 { return justNow }
 
     let minutes = Int(interval / 60)
-    if minutes < 60 { return "last activity \(minutes)m ago" }
+    if minutes < 60 { return "\(prefix)\(minutes)m ago" }
 
     let hours = minutes / 60
-    if hours < 24 { return "last activity \(hours)h ago" }
+    if hours < 24 { return "\(prefix)\(hours)h ago" }
+    return "\(prefix)\(hours / 24)d ago"
+}
 
-    return "last activity \(hours / 24)d ago"
+func formatLastActivity(_ date: Date?, now: Date) -> String {
+    relativeAge(date, now: now, unknown: "last activity unknown",
+                future: "last activity in future", justNow: "just now",
+                prefix: "last activity ")
 }
 
 func formatSessionSnapshotAge(_ date: Date?, now: Date) -> String {
-    guard let date else { return "last update unknown" }
-    let interval = now.timeIntervalSince(date)
-    if interval < 0 { return "last update in future" }
-    if interval < 60 { return "updated just now" }
-
-    let minutes = Int(interval / 60)
-    if minutes < 60 { return "updated \(minutes)m ago" }
-
-    let hours = minutes / 60
-    if hours < 24 { return "updated \(hours)h ago" }
-    return "updated \(hours / 24)d ago"
+    relativeAge(date, now: now, unknown: "last update unknown",
+                future: "last update in future", justNow: "updated just now",
+                prefix: "updated ")
 }
 
 func formatSessionRefreshAge(_ date: Date?, now: Date) -> String {
-    guard let date else { return "last refresh unknown" }
-    let interval = now.timeIntervalSince(date)
-    if interval < 0 { return "last refresh in future" }
-    if interval < 60 { return "last refresh just now" }
-
-    let minutes = Int(interval / 60)
-    if minutes < 60 { return "last refresh \(minutes)m ago" }
-
-    let hours = minutes / 60
-    if hours < 24 { return "last refresh \(hours)h ago" }
-    return "last refresh \(hours / 24)d ago"
+    relativeAge(date, now: now, unknown: "last refresh unknown",
+                future: "last refresh in future", justNow: "last refresh just now",
+                prefix: "last refresh ")
 }
 
 func sessionRunwayCountsText(for snapshot: SessionActivitySnapshot) -> String {
