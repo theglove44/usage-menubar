@@ -75,21 +75,21 @@ final class SessionActivityTests: XCTestCase {
         XCTAssertEqual(formatSessionSnapshotAge(nil, now: now), "last update unknown")
     }
 
-    func testMenuBarLabelIncludesSessionCountOrHonestStatus() {
-        let live = SessionActivitySnapshot(
-            status: .ready,
-            sessions: [MenuBarSession(id: "active", provider: "Codex", state: .active)]
-        )
-        let unavailable = SessionActivitySnapshot.unavailable
+    func testMenuBarLabelShowsOnlyTheChosenProvider() {
+        XCTAssertEqual(menuBarLabelText(provider: .codex, pct: 12), "Codex 12%")
+        XCTAssertEqual(menuBarLabelText(provider: .claude, pct: 87.4), "Claude 87%")
+        XCTAssertEqual(menuBarLabelText(provider: .codex, pct: nil), "Codex --")
+    }
 
-        XCTAssertEqual(
-            menuBarLabelText(codex: 12, claude: nil, sessions: live),
-            "C 12%u · Cl --u · S 1A/0W"
-        )
-        XCTAssertEqual(
-            menuBarLabelText(codex: nil, claude: nil, sessions: unavailable),
-            "C --u · Cl --u · S unavailable"
-        )
+    func testMenuBarGaugeFillsOneSegmentPerTenPercent() {
+        XCTAssertEqual(menuBarFilledSegments(pct: nil), 0)
+        XCTAssertEqual(menuBarFilledSegments(pct: 0), 0)
+        // Any usage at all lights one block, so it never looks like "no data".
+        XCTAssertEqual(menuBarFilledSegments(pct: 1), 1)
+        XCTAssertEqual(menuBarFilledSegments(pct: 45), 5)
+        XCTAssertEqual(menuBarFilledSegments(pct: 100), 10)
+        XCTAssertEqual(menuBarFilledSegments(pct: 140), 10)
+        XCTAssertEqual(menuBarFilledSegments(pct: -5), 0)
     }
 
     @MainActor

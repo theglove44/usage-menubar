@@ -7,6 +7,7 @@ struct UsageMenuBarApp: App {
     @StateObject private var sessionStore = SessionActivityStore(
         provider: LocalSessionRunwayActivityProvider()
     )
+    @StateObject private var preferences = MenuBarPreferences()
 
     init() {
         // No Dock icon, no Cmd-Tab entry — pure menu bar utility.
@@ -15,9 +16,9 @@ struct UsageMenuBarApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            QuotaView(store: store, sessionStore: sessionStore)
+            QuotaView(store: store, sessionStore: sessionStore, preferences: preferences)
         } label: {
-            MenuBarLabel(store: store, sessionStore: sessionStore)
+            MenuBarLabel(store: store, preferences: preferences)
         }
         .menuBarExtraStyle(.window)
     }

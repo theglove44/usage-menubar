@@ -141,6 +141,7 @@ struct ProviderCard: View {
 struct QuotaView: View {
     @ObservedObject var store: QuotaStore
     @ObservedObject var sessionStore: SessionActivityStore
+    @ObservedObject var preferences: MenuBarPreferences
     @State private var now = Date()
 
     private let clock = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
@@ -183,6 +184,14 @@ struct QuotaView: View {
 
             Divider()
 
+            Picker("Menu bar shows", selection: $preferences.provider) {
+                ForEach(MenuBarProvider.allCases) { provider in
+                    Text(provider.displayName).tag(provider)
+                }
+            }
+            .pickerStyle(.segmented)
+            .font(.caption)
+
             Button("Open Claude usage") {
                 if let url = URL(string: "https://claude.ai/settings/usage") {
                     NSWorkspace.shared.open(url)
@@ -216,17 +225,28 @@ struct QuotaView: View {
 
 struct MenuBarLabel: View {
     @ObservedObject var store: QuotaStore
-    @ObservedObject var sessionStore: SessionActivityStore
+    @ObservedObject var preferences: MenuBarPreferences
 
     var body: some View {
-        let codexPct = store.codex.flatMap { $0.fiveHourPct ?? $0.weeklyPct }
-        let claudePct = store.claude?.fiveHourPct
-        Text(menuBarLabelText(codex: codexPct, claude: claudePct, sessions: sessionStore.snapshot))
+        let pct = store.menuBarPct(for: preferences.provider)
+        HStack(spacing: 4) {
+            if let image = renderMenuBarGauge(pct: pct) {
+                Image(nsImage: image)
+            }
+            Text(menuBarLabelText(provider: preferences.provider, pct: pct))
+        }
     }
 }
 
-func menuBarLabelText(codex: Double?, claude: Double?, sessions: SessionActivitySnapshot) -> String {
-    let c = codex.map { "\(Int($0.rounded()))%" } ?? "--"
-    let cl = claude.map { "\(Int($0.rounded()))%" } ?? "--"
-    return "C \(c)u · Cl \(cl)u · S \(sessions.compactCount)"
+extension QuotaStore {
+    // The menu bar shows the shortest window that has data, because that is the
+    // limit you are most likely to hit next.
+    func menuBarPct(for provider: MenuBarProvider) -> Double? {
+        let quota: ProviderQuota?
+        switch provider {
+        case .codex: quota = codex
+        case .claude: quota = claude
+        }
+        return quota.flatMap { $0.fiveHourPct ?? $0.weeklyPct }
+    }
 }

@@ -30,7 +30,11 @@ with an authentication warning.
 - `Sources/UsageMenuBar/QuotaStore.swift` — `ObservableObject`, Anthropic quota
   polling (`Timer`, 60s), macOS Keychain access, and local snapshot fallback.
 - `Sources/UsageMenuBar/QuotaView.swift` — the dropdown UI (progress bars,
-  reset countdowns) and the menu bar label text.
+  reset countdowns, the menu bar provider picker) and the menu bar label.
+- `Sources/UsageMenuBar/MenuBarPreference.swift` — which single provider the
+  menu bar shows, persisted in `UserDefaults` under `menuBarProvider`.
+- `Sources/UsageMenuBar/MenuBarGauge.swift` — the ten-block usage gauge drawn
+  into an `NSImage` (a `MenuBarExtra` label only renders Text and Image).
 - `Sources/UsageMenuBar/UsageMenuBarApp.swift` — `@main` entry, sets
   `.accessory` activation policy so there's no Dock icon.
 
