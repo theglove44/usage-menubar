@@ -6,6 +6,7 @@ import SwiftUI
 enum MenuBarProvider: String, CaseIterable, Identifiable {
     case codex
     case claude
+    case grok
 
     var id: String { rawValue }
 
@@ -13,6 +14,7 @@ enum MenuBarProvider: String, CaseIterable, Identifiable {
         switch self {
         case .codex: return "Codex"
         case .claude: return "Claude"
+        case .grok: return "Grok"
         }
     }
 }

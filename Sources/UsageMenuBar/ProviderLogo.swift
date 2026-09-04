@@ -4,11 +4,13 @@ import SwiftUI
 enum ProviderBrand: String {
     case codex
     case claude
+    case grok
 
     var resourceName: String {
         switch self {
         case .codex: return "OpenAI"
         case .claude: return "Claude"
+        case .grok: return "Grok"
         }
     }
 
@@ -16,6 +18,7 @@ enum ProviderBrand: String {
         switch self {
         case .codex: return "OpenAI logo"
         case .claude: return "Claude logo"
+        case .grok: return "Grok logo"
         }
     }
 
@@ -23,6 +26,7 @@ enum ProviderBrand: String {
         switch self {
         case .codex: return .primary
         case .claude: return Color(red: 0.82, green: 0.35, blue: 0.23)
+        case .grok: return .primary
         }
     }
 }

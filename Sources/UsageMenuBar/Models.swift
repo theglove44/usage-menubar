@@ -91,6 +91,77 @@ struct CodexLimits: Decodable {
     }
 }
 
+// Grok usage comes from the Grok CLI's log at ~/.grok/logs/unified.jsonl. After
+// each completed turn the CLI fetches the account's credit usage from xAI's
+// billing service and logs it as a "billing: fetched credits config" line. That
+// number is the whole SuperGrok subscription's weekly usage, not this machine's
+// share — but it only refreshes while the Grok CLI is used on this Mac, which is
+// why the staleness field matters for this provider.
+enum GrokLimits {
+    static let billingMessage = "billing: fetched credits config"
+
+    struct LogRecord: Decodable {
+        struct Ctx: Decodable { let config: Config }
+        struct Config: Decodable {
+            let creditUsagePercent: Double
+            let currentPeriod: Period?
+        }
+        struct Period: Decodable { let end: String }
+        let ts: String
+        let msg: String
+        let ctx: Ctx
+    }
+
+    // Scans JSONL data backwards for the newest billing line and maps it onto the
+    // shared ProviderQuota shape. Grok only has a weekly window, no 5-hour one.
+    static func latestQuota(fromLogData data: Data, now: Date) -> ProviderQuota? {
+        guard let record = latestBillingRecord(in: data) else { return nil }
+        let capturedAt = parseDate(record.ts)
+        return ProviderQuota(
+            id: "grok",
+            name: "Grok",
+            fiveHourPct: nil,
+            fiveHourResetsAt: nil,
+            weeklyPct: record.ctx.config.creditUsagePercent,
+            weeklyResetsAt: record.ctx.config.currentPeriod.flatMap { parseDate($0.end) },
+            staleness: capturedAt.map { now.timeIntervalSince($0) },
+            sourceDevice: "xAI account"
+        )
+    }
+
+    private static func latestBillingRecord(in data: Data) -> LogRecord? {
+        guard let text = String(data: data, encoding: .utf8) else { return nil }
+        let decoder = JSONDecoder()
+        for line in text.split(separator: "\n").reversed() {
+            guard line.contains(billingMessage),
+                  let lineData = line.data(using: .utf8),
+                  let record = try? decoder.decode(LogRecord.self, from: lineData),
+                  record.msg == billingMessage
+            else { continue }
+            return record
+        }
+        return nil
+    }
+
+    // The log mixes fraction lengths ("...12.448Z" and "...01.539882+00:00");
+    // ISO8601DateFormatter only accepts exactly three fractional digits, so trim
+    // longer fractions to milliseconds before parsing.
+    static func parseDate(_ string: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        if let date = fractional.date(from: string) ?? plain.date(from: string) {
+            return date
+        }
+        let trimmed = string.replacingOccurrences(
+            of: #"(\.\d{3})\d+"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        return fractional.date(from: trimmed) ?? plain.date(from: trimmed)
+    }
+}
+
 // Unified shape the view renders, so Claude/Codex share one code path.
 struct ProviderQuota: Identifiable {
     let id: String

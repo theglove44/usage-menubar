@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal hand-drawn approximation of the xAI/Grok slanted-X mark, kept as a
+     simple template shape so it tints like the other provider logos. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <g fill="#000000">
+    <path d="M17.5 2 L22 2 L6.5 22 L2 22 Z"/>
+    <path d="M2 2 L6.5 2 L11.6 8.6 L9.35 11.5 Z"/>
+    <path d="M17.5 22 L22 22 L22 8.5 Z"/>
+  </g>
+</svg>

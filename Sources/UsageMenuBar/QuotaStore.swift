@@ -17,11 +17,13 @@ import Foundation
 final class QuotaStore: ObservableObject {
     @Published var claude: ProviderQuota?
     @Published var codex: ProviderQuota?
+    @Published var grok: ProviderQuota?
     @Published var claudeState: ClaudeUsageState = .refreshing
 
     private let claudeMergedPath = NSString(string: "~/.claude/usage-dashboard/claude-rate-limits-merged.json").expandingTildeInPath
     private let claudeLocalPath = NSString(string: "~/.claude/usage-dashboard/claude-rate-limits.json").expandingTildeInPath
     private let codexPath = NSString(string: "~/.claude/usage-dashboard/codex-rate-limits.json").expandingTildeInPath
+    private let grokLogPath = NSString(string: "~/.grok/logs/unified.jsonl").expandingTildeInPath
     private let dependencies: QuotaDependencies
     private var timer: Timer?
     private var refreshInProgress = false
@@ -56,6 +58,7 @@ final class QuotaStore: ObservableObject {
             claude = snapshot.quota
         }
         codex = loadCodex()
+        grok = loadGrok()
     }
 
     // Asks Claude's API for current usage, at most once per refresh interval, skipping
@@ -198,5 +201,21 @@ final class QuotaStore: ObservableObject {
             staleness: capturedAt.map { dependencies.now().timeIntervalSince($0) },
             sourceDevice: nil
         )
+    }
+
+    // Reads the tail of the Grok CLI's log rather than the whole thing — the file
+    // grows without rotation and only the newest billing line matters. 4 MiB is
+    // roughly the log's total size after two weeks, so the newest billing line
+    // (typically within the last 100 KiB) is always inside the window.
+    private func loadGrok() -> ProviderQuota? {
+        guard let handle = FileHandle(forReadingAtPath: grokLogPath) else { return nil }
+        defer { try? handle.close() }
+        let tailLimit: UInt64 = 4 * 1024 * 1024
+        guard let size = try? handle.seekToEnd() else { return nil }
+        let offset = size > tailLimit ? size - tailLimit : 0
+        guard (try? handle.seek(toOffset: offset)) != nil,
+              let data = try? handle.readToEnd()
+        else { return nil }
+        return GrokLimits.latestQuota(fromLogData: data, now: dependencies.now())
     }
 }

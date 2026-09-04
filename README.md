@@ -1,6 +1,7 @@
 # usage-menubar
 
-Native macOS menu bar app showing live Codex + account-wide Claude usage quotas.
+Native macOS menu bar app showing live Codex, account-wide Claude, and
+account-wide Grok usage quotas.
 
 Self-built replacement for [`shanggqm/codexU`](https://github.com/shanggqm/codexU) —
 same idea, but self-hosted: no third-party binary. Claude usage comes directly
@@ -34,6 +35,13 @@ Codex usage and Claude fallback data come from:
 These snapshots are written by the companion dashboard at `~/.claude/usage-dashboard/`
 ([theglove44/usage-dashboard](https://github.com/theglove44/usage-dashboard) —
 see that repo for how the snapshots themselves get captured).
+
+Grok usage comes from the Grok CLI's own log at `~/.grok/logs/unified.jsonl`.
+After each completed turn the CLI fetches the SuperGrok subscription's weekly
+credit usage from xAI's billing service and logs it; the app reads the newest
+of those entries every 60 seconds. The number is account-wide, but it only
+refreshes while the Grok CLI is used on this Mac — the card shows a staleness
+note when the last reading is over an hour old.
 
 Only Anthropic's authenticated usage endpoint receives a network request. No
 OAuth token leaves this Mac except in that request to Anthropic.

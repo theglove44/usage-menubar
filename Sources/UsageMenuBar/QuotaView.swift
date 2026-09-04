@@ -118,7 +118,7 @@ struct ProviderCard: View {
                     brand: brand
                 )
             }
-            if let staleness = quota.staleness, staleness > 3600, quota.id == "codex" {
+            if let staleness = quota.staleness, staleness > 3600, quota.id != "claude" {
                 Text(stalenessText(hours: Int(staleness / 3600)))
                     .font(.caption2)
                     .foregroundStyle(.orange)
@@ -166,6 +166,11 @@ struct QuotaView: View {
                 } else {
                     emptyCard("Claude", "no data yet")
                 }
+                if let grok = store.grok {
+                    ProviderCard(quota: grok, now: now)
+                } else {
+                    emptyCard("Grok", "no data yet")
+                }
             }
 
             if let message = store.claudeState.message {
@@ -208,7 +213,7 @@ struct QuotaView: View {
             .foregroundStyle(.secondary)
         }
         .padding(12)
-        .frame(width: 350)
+        .frame(width: 470)
         .onReceive(clock) { t in now = t }
     }
 
@@ -246,6 +251,7 @@ extension QuotaStore {
         switch provider {
         case .codex: quota = codex
         case .claude: quota = claude
+        case .grok: quota = grok
         }
         return quota.flatMap { $0.fiveHourPct ?? $0.weeklyPct }
     }
