@@ -1,8 +1,9 @@
-import XCTest
+import Foundation
+import Testing
 @testable import UsageMenuBar
 
-final class SessionActivityTests: XCTestCase {
-    func testReadySnapshotCountsOnlyActiveAndWaitingSessions() {
+struct SessionActivityTests {
+    @Test func readySnapshotCountsOnlyActiveAndWaitingSessions() {
         let snapshot = SessionActivitySnapshot(
             status: .ready,
             sessions: [
@@ -13,46 +14,45 @@ final class SessionActivityTests: XCTestCase {
             ]
         )
 
-        XCTAssertEqual(snapshot.activeCount, 1)
-        XCTAssertEqual(snapshot.waitingCount, 1)
-        XCTAssertEqual(snapshot.compactCount, "1A/1W")
+        #expect(snapshot.activeCount == 1)
+        #expect(snapshot.waitingCount == 1)
+        #expect(snapshot.compactCount == "1A/1W")
     }
 
-    func testUncertainMonitorStatusDoesNotExposeStaleCounts() {
+    @Test func uncertainMonitorStatusDoesNotExposeStaleCounts() {
         let stale = SessionActivitySnapshot(
             status: .stale,
             sessions: [MenuBarSession(id: "active", provider: "Codex", state: .active)]
         )
         let unavailable = SessionActivitySnapshot.unavailable
 
-        XCTAssertEqual(stale.compactCount, "stale")
-        XCTAssertEqual(stale.activeCount, 0)
-        XCTAssertEqual(unavailable.compactCount, "unavailable")
-        XCTAssertEqual(unavailable.waitingCount, 0)
+        #expect(stale.compactCount == "stale")
+        #expect(stale.activeCount == 0)
+        #expect(unavailable.compactCount == "unavailable")
+        #expect(unavailable.waitingCount == 0)
     }
 
-    func testSnapshotStatusDoesNotOverwritePerRowState() {
+    @Test func snapshotStatusDoesNotOverwritePerRowState() {
         let session = MenuBarSession(
             id: "session",
             provider: "Codex",
             state: .active
         )
 
-        XCTAssertEqual(
-            SessionActivitySnapshot(status: .stale, sessions: [session]).displayState(for: session),
-            .active
+        #expect(
+            SessionActivitySnapshot(status: .stale, sessions: [session]).displayState(for: session)
+                == .active
         )
-        XCTAssertEqual(
-            SessionActivitySnapshot(status: .unknown, sessions: [session]).displayState(for: session),
-            .active
+        #expect(
+            SessionActivitySnapshot(status: .unknown, sessions: [session]).displayState(for: session)
+                == .active
         )
-        XCTAssertEqual(
-            SessionActivitySnapshot.unavailable.displayState(for: session),
-            .providerUnavailable
+        #expect(
+            SessionActivitySnapshot.unavailable.displayState(for: session) == .providerUnavailable
         )
     }
 
-    func testMissingSessionMetadataUsesExplicitUnknownLabels() {
+    @Test func missingSessionMetadataUsesExplicitUnknownLabels() {
         let session = MenuBarSession(
             id: "session",
             provider: " \n",
@@ -61,46 +61,46 @@ final class SessionActivityTests: XCTestCase {
             state: .unknown
         )
 
-        XCTAssertEqual(session.displayProvider, "Unknown provider")
-        XCTAssertEqual(session.displayProjectTitle, "Unknown project")
-        XCTAssertEqual(session.displaySessionTitle, "Untitled session")
+        #expect(session.displayProvider == "Unknown provider")
+        #expect(session.displayProjectTitle == "Unknown project")
+        #expect(session.displaySessionTitle == "Untitled session")
     }
 
-    func testActivityFormattingDoesNotPretendMissingTimestampIsRecent() {
+    @Test func activityFormattingDoesNotPretendMissingTimestampIsRecent() {
         let now = Date(timeIntervalSince1970: 1_000_000)
 
-        XCTAssertEqual(formatLastActivity(nil, now: now), "last activity unknown")
-        XCTAssertEqual(formatLastActivity(now.addingTimeInterval(-90), now: now), "last activity 1m ago")
-        XCTAssertEqual(formatLastActivity(now.addingTimeInterval(30), now: now), "last activity in future")
-        XCTAssertEqual(formatSessionSnapshotAge(nil, now: now), "last update unknown")
+        #expect(formatLastActivity(nil, now: now) == "last activity unknown")
+        #expect(formatLastActivity(now.addingTimeInterval(-90), now: now) == "last activity 1m ago")
+        #expect(formatLastActivity(now.addingTimeInterval(30), now: now) == "last activity in future")
+        #expect(formatSessionSnapshotAge(nil, now: now) == "last update unknown")
     }
 
-    func testMenuBarLabelShowsOnlyTheChosenProvider() {
-        XCTAssertEqual(menuBarLabelText(provider: .codex, pct: 12), "Codex 12%")
-        XCTAssertEqual(menuBarLabelText(provider: .claude, pct: 87.4), "Claude 87%")
-        XCTAssertEqual(menuBarLabelText(provider: .codex, pct: nil), "Codex --")
+    @Test func menuBarLabelShowsOnlyTheChosenProvider() {
+        #expect(menuBarLabelText(provider: .codex, pct: 12) == "Codex 12%")
+        #expect(menuBarLabelText(provider: .claude, pct: 87.4) == "Claude 87%")
+        #expect(menuBarLabelText(provider: .grok, pct: 32) == "Grok 32%")
+        #expect(menuBarLabelText(provider: .codex, pct: nil) == "Codex --")
     }
 
-    func testMenuBarGaugeFillsOneSegmentPerTenPercent() {
-        XCTAssertEqual(menuBarFilledSegments(pct: nil), 0)
-        XCTAssertEqual(menuBarFilledSegments(pct: 0), 0)
+    @Test func menuBarGaugeFillsOneSegmentPerTenPercent() {
+        #expect(menuBarFilledSegments(pct: nil) == 0)
+        #expect(menuBarFilledSegments(pct: 0) == 0)
         // Any usage at all lights one block, so it never looks like "no data".
-        XCTAssertEqual(menuBarFilledSegments(pct: 1), 1)
-        XCTAssertEqual(menuBarFilledSegments(pct: 45), 5)
-        XCTAssertEqual(menuBarFilledSegments(pct: 100), 10)
-        XCTAssertEqual(menuBarFilledSegments(pct: 140), 10)
-        XCTAssertEqual(menuBarFilledSegments(pct: -5), 0)
+        #expect(menuBarFilledSegments(pct: 1) == 1)
+        #expect(menuBarFilledSegments(pct: 45) == 5)
+        #expect(menuBarFilledSegments(pct: 100) == 10)
+        #expect(menuBarFilledSegments(pct: 140) == 10)
+        #expect(menuBarFilledSegments(pct: -5) == 0)
     }
 
-    @MainActor
-    func testStoreStartsFromInjectedProviderAndAcceptsUpdates() {
+    @Test @MainActor func storeStartsFromInjectedProviderAndAcceptsUpdates() {
         let initial = PreviewSessionActivityProvider(now: Date(timeIntervalSince1970: 1_000_000))
         let store = SessionActivityStore(provider: initial)
 
-        XCTAssertEqual(store.snapshot, initial.snapshot)
+        #expect(store.snapshot == initial.snapshot)
 
         store.update(.init(status: .unknown))
 
-        XCTAssertEqual(store.snapshot.status, .unknown)
+        #expect(store.snapshot.status == .unknown)
     }
 }

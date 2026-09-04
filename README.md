@@ -46,6 +46,17 @@ note when the last reading is over an hour old.
 Only Anthropic's authenticated usage endpoint receives a network request. No
 OAuth token leaves this Mac except in that request to Anthropic.
 
+## Tests
+
+```
+./scripts/test.sh
+```
+
+40 tests. The suite uses Swift Testing rather than XCTest, because the macOS
+Command Line Tools no longer ship XCTest and this project deliberately avoids
+requiring a full Xcode install. The script adds the framework search paths that
+`swift test` does not supply on its own.
+
 ## Claude authentication
 
 Sign Claude Code into the same Claude subscription used at claude.ai:

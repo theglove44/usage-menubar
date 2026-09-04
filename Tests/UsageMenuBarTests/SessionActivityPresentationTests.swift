@@ -1,10 +1,11 @@
-import XCTest
+import Foundation
+import Testing
 @testable import UsageMenuBar
 
-final class SessionActivityPresentationTests: XCTestCase {
+struct SessionActivityPresentationTests {
     private let now = Date(timeIntervalSince1970: 1_000_000)
 
-    func testPresentationFiltersNonLiveRowsWithoutGlobalStateOverride() {
+    @Test func presentationFiltersNonLiveRowsWithoutGlobalStateOverride() {
         let snapshot = SessionActivitySnapshot(
             status: .unknown,
             sessions: [
@@ -18,14 +19,14 @@ final class SessionActivityPresentationTests: XCTestCase {
 
         let presentation = sessionRunwayPresentation(for: snapshot)
 
-        XCTAssertEqual(presentation.visibleSessions.map(\.id), ["active", "waiting"])
-        XCTAssertEqual(presentation.activeCount, 1)
-        XCTAssertEqual(presentation.waitingCount, 1)
-        XCTAssertEqual(presentation.omittedNonLiveCount, 3)
-        XCTAssertEqual(presentation.visibleSessions.map(\.state), [.active, .waiting])
+        #expect(presentation.visibleSessions.map(\.id) == ["active", "waiting"])
+        #expect(presentation.activeCount == 1)
+        #expect(presentation.waitingCount == 1)
+        #expect(presentation.omittedNonLiveCount == 3)
+        #expect(presentation.visibleSessions.map(\.state) == [.active, .waiting])
     }
 
-    func testPresentationRanksActiveBeforeWaitingThenNewestActivity() {
+    @Test func presentationRanksActiveBeforeWaitingThenNewestActivity() {
         let snapshot = SessionActivitySnapshot(
             status: .ready,
             sessions: [
@@ -38,13 +39,13 @@ final class SessionActivityPresentationTests: XCTestCase {
 
         let presentation = sessionRunwayPresentation(for: snapshot)
 
-        XCTAssertEqual(
-            presentation.visibleSessions.map(\.id),
-            ["active-new", "active-old", "waiting-new", "waiting-old"]
+        #expect(
+            presentation.visibleSessions.map(\.id)
+                == ["active-new", "active-old", "waiting-new", "waiting-old"]
         )
     }
 
-    func testPresentationCapsRowsAndReportsHiddenAndNonLiveData() {
+    @Test func presentationCapsRowsAndReportsHiddenAndNonLiveData() {
         let live = (0..<6).map { index in
             session(id: "live-\(index)", state: .active, age: TimeInterval(index))
         }
@@ -55,16 +56,16 @@ final class SessionActivityPresentationTests: XCTestCase {
 
         let presentation = sessionRunwayPresentation(for: snapshot, maxVisibleRows: 3)
 
-        XCTAssertEqual(presentation.visibleSessions.count, 3)
-        XCTAssertEqual(presentation.hiddenLiveCount, 3)
-        XCTAssertEqual(presentation.omittedNonLiveCount, 1)
-        XCTAssertEqual(
-            presentation.diagnosticText,
-            "+3 recent sessions hidden · 1 non-live sessions omitted"
+        #expect(presentation.visibleSessions.count == 3)
+        #expect(presentation.hiddenLiveCount == 3)
+        #expect(presentation.omittedNonLiveCount == 1)
+        #expect(
+            presentation.diagnosticText
+                == "+3 recent sessions hidden · 1 non-live sessions omitted"
         )
     }
 
-    func testSyntheticSessionTitleFallsBackToProject() {
+    @Test func syntheticSessionTitleFallsBackToProject() {
         let session = MenuBarSession(
             id: "019fc255-f153-7e03-a334-8c5612d3b4e9",
             provider: "Codex",
@@ -73,10 +74,10 @@ final class SessionActivityPresentationTests: XCTestCase {
             state: .active
         )
 
-        XCTAssertEqual(sessionRunwayTitle(for: session), "usage-menubar")
+        #expect(sessionRunwayTitle(for: session) == "usage-menubar")
     }
 
-    func testStatusTextShowsLiveCountsAndRefreshAge() {
+    @Test func statusTextShowsLiveCountsAndRefreshAge() {
         let snapshot = SessionActivitySnapshot(
             status: .ready,
             sessions: [
@@ -86,14 +87,11 @@ final class SessionActivityPresentationTests: XCTestCase {
             capturedAt: now.addingTimeInterval(-120)
         )
 
-        XCTAssertEqual(
-            sessionRunwayStatusText(for: snapshot),
-            "Live · 1 active · 1 waiting"
-        )
-        XCTAssertEqual(formatSessionRefreshAge(snapshot.capturedAt, now: now), "last refresh 2m ago")
+        #expect(sessionRunwayStatusText(for: snapshot) == "Live · 1 active · 1 waiting")
+        #expect(formatSessionRefreshAge(snapshot.capturedAt, now: now) == "last refresh 2m ago")
     }
 
-    func testUnknownRowsNeverCountAsActive() {
+    @Test func unknownRowsNeverCountAsActive() {
         let snapshot = SessionActivitySnapshot(
             status: .ready,
             sessions: [session(id: "unknown", state: .unknown)]
@@ -101,9 +99,9 @@ final class SessionActivityPresentationTests: XCTestCase {
 
         let presentation = sessionRunwayPresentation(for: snapshot)
 
-        XCTAssertEqual(presentation.activeCount, 0)
-        XCTAssertEqual(presentation.waitingCount, 0)
-        XCTAssertTrue(presentation.visibleSessions.isEmpty)
+        #expect(presentation.activeCount == 0)
+        #expect(presentation.waitingCount == 0)
+        #expect(presentation.visibleSessions.isEmpty)
     }
 
     private func session(

@@ -61,6 +61,11 @@ app path changes.
 
 ## Editing notes
 
+- Tests: run `./scripts/test.sh`, not bare `swift test`. The suite uses Swift
+  Testing (`@Test` / `#expect`) because the Command Line Tools ship no XCTest,
+  and the script supplies the framework search paths SwiftPM omits. `Package.swift`
+  is on tools-version 6.0 for Swift Testing but pins `swiftLanguageModes: [.v5]`
+  — the app code is not Swift 6 concurrency-clean.
 - No Xcode project on purpose — plain `swift build` is enough for a
   menu-bar-only app this size. Don't add an `.xcodeproj` unless the app
   grows features that actually need Interface Builder / asset catalogs.

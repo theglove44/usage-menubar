@@ -1,9 +1,9 @@
 import Foundation
-import XCTest
+import Testing
 @testable import UsageMenuBar
 
-final class SessionRunwayTests: XCTestCase {
-    func testRecentTranscriptWithoutProcessIsNotActiveEvenAfterFileChange() async {
+struct SessionRunwayTests {
+    @Test func recentTranscriptWithoutProcessIsNotActiveEvenAfterFileChange() async {
         let fixture = RunwayFixture()
         let firstTime = fixture.now.addingTimeInterval(-10)
         let path = URL(fileURLWithPath: "/fixture/codex/sessions/rollout-recent.jsonl")
@@ -17,8 +17,8 @@ final class SessionRunwayTests: XCTestCase {
 
         let scanner = makeScanner(fixture)
         let first = await scanner.scan()
-        XCTAssertEqual(first.rows.first?.state, .openIdle)
-        XCTAssertFalse(first.rows.first?.evidence.contains(.transcriptOpenByProcess) ?? true)
+        #expect(first.rows.first?.state == .openIdle)
+        #expect(!(first.rows.first?.evidence.contains(.transcriptOpenByProcess) ?? true))
 
         let secondTime = fixture.now
         fixture.now = secondTime
@@ -30,12 +30,12 @@ final class SessionRunwayTests: XCTestCase {
         )
 
         let second = await scanner.scan()
-        XCTAssertEqual(second.rows.first?.state, .openIdle)
-        XCTAssertFalse(second.rows.first?.state == .activeWorking)
-        XCTAssertTrue(second.rows.first?.evidence.contains(.fileChanged) ?? false)
+        #expect(second.rows.first?.state == .openIdle)
+        #expect(second.rows.first?.state != .activeWorking)
+        #expect(second.rows.first?.evidence.contains(.fileChanged) ?? false)
     }
 
-    func testHistoricalTranscriptHiddenButOpenPathBypassesLookback() async {
+    @Test func historicalTranscriptHiddenButOpenPathBypassesLookback() async {
         let fixture = RunwayFixture()
         let path = URL(fileURLWithPath: "/fixture/codex/sessions/rollout-old.jsonl")
         fixture.add(
@@ -48,9 +48,9 @@ final class SessionRunwayTests: XCTestCase {
 
         let scanner = makeScanner(fixture)
         let hidden = await scanner.scan()
-        XCTAssertTrue(hidden.rows.isEmpty)
-        XCTAssertEqual(hidden.hiddenHistoricalCount, 1)
-        XCTAssertEqual(hidden.diagnostics.hiddenHistoricalCount, 1)
+        #expect(hidden.rows.isEmpty)
+        #expect(hidden.hiddenHistoricalCount == 1)
+        #expect(hidden.diagnostics.hiddenHistoricalCount == 1)
 
         fixture.processSnapshot = SessionRunwayProcessSnapshot(
             openTranscriptPaths: [path.standardizedFileURL.path],
@@ -59,12 +59,12 @@ final class SessionRunwayTests: XCTestCase {
             available: true
         )
         let live = await scanner.scan()
-        XCTAssertEqual(live.rows.count, 1)
-        XCTAssertEqual(live.rows.first?.state, .activeWorking)
-        XCTAssertEqual(live.hiddenHistoricalCount, 0)
+        #expect(live.rows.count == 1)
+        #expect(live.rows.first?.state == .activeWorking)
+        #expect(live.hiddenHistoricalCount == 0)
     }
 
-    func testHistoricalTranscriptCanBeKeptBySessionRegistryID() async {
+    @Test func historicalTranscriptCanBeKeptBySessionRegistryID() async {
         let fixture = RunwayFixture()
         let path = URL(fileURLWithPath: "/fixture/codex/sessions/rollout-registry.jsonl")
         fixture.add(
@@ -82,12 +82,12 @@ final class SessionRunwayTests: XCTestCase {
         )
 
         let snapshot = await makeScanner(fixture).scan()
-        XCTAssertEqual(snapshot.rows.count, 1)
-        XCTAssertEqual(snapshot.rows.first?.state, .activeWorking)
-        XCTAssertTrue(snapshot.rows.first?.evidence.contains(.transcriptOpenByProcess) ?? false)
+        #expect(snapshot.rows.count == 1)
+        #expect(snapshot.rows.first?.state == .activeWorking)
+        #expect(snapshot.rows.first?.evidence.contains(.transcriptOpenByProcess) ?? false)
     }
 
-    func testFutureEventTimestampIsRejectedAndCannotMakeRowActive() async {
+    @Test func futureEventTimestampIsRejectedAndCannotMakeRowActive() async {
         let fixture = RunwayFixture()
         let path = URL(fileURLWithPath: "/fixture/codex/sessions/rollout-future.jsonl")
         let future = fixture.now.addingTimeInterval(10 * 60)
@@ -100,13 +100,13 @@ final class SessionRunwayTests: XCTestCase {
         )
 
         let snapshot = await makeScanner(fixture).scan()
-        XCTAssertEqual(snapshot.diagnostics.futureTimestampCount, 1)
-        XCTAssertEqual(snapshot.rows.first?.state, .openIdle)
-        XCTAssertFalse(snapshot.rows.first?.evidence.contains(.recentEvent) ?? true)
-        XCTAssertFalse(snapshot.rows.first?.state == .activeWorking)
+        #expect(snapshot.diagnostics.futureTimestampCount == 1)
+        #expect(snapshot.rows.first?.state == .openIdle)
+        #expect(!(snapshot.rows.first?.evidence.contains(.recentEvent) ?? true))
+        #expect(snapshot.rows.first?.state != .activeWorking)
     }
 
-    func testFutureFileTimestampProducesUnknownState() async {
+    @Test func futureFileTimestampProducesUnknownState() async {
         let fixture = RunwayFixture()
         let path = URL(fileURLWithPath: "/fixture/codex/sessions/rollout-clock-skew.jsonl")
         fixture.add(
@@ -118,11 +118,11 @@ final class SessionRunwayTests: XCTestCase {
         )
 
         let snapshot = await makeScanner(fixture).scan()
-        XCTAssertEqual(snapshot.rows.first?.state, .unknown)
-        XCTAssertFalse(snapshot.rows.first?.state == .activeWorking)
+        #expect(snapshot.rows.first?.state == .unknown)
+        #expect(snapshot.rows.first?.state != .activeWorking)
     }
 
-    func testTitleFallbackOrderAndCompaction() {
+    @Test func titleFallbackOrderAndCompaction() {
         let now = Date(timeIntervalSince1970: 1_000_000_000)
         var rules = SessionRunwayRules()
         rules.clockSkewTolerance = 120
@@ -143,7 +143,7 @@ final class SessionRunwayTests: XCTestCase {
             rules: rules,
             codexTitles: SessionRunwayCodexTitleLookup { _, _ in "State title" }
         )
-        XCTAssertEqual(stateTitle?.title, "State title")
+        #expect(stateTitle?.title == "State title")
 
         let prompt = SessionRunwayParser.parse(
             provider: .codex,
@@ -154,7 +154,7 @@ final class SessionRunwayTests: XCTestCase {
             now: now,
             rules: rules
         )
-        XCTAssertEqual(prompt?.title, "Implement the local session runway")
+        #expect(prompt?.title == "Implement the local session runway")
 
         let claude = SessionRunwayParser.parse(
             provider: .claudeCode,
@@ -167,7 +167,7 @@ final class SessionRunwayTests: XCTestCase {
             now: now,
             rules: rules
         )
-        XCTAssertEqual(claude?.title, "Claude cockpit")
+        #expect(claude?.title == "Claude cockpit")
 
         let genericPrompt = SessionRunwayParser.parse(
             provider: .claudeCode,
@@ -180,14 +180,14 @@ final class SessionRunwayTests: XCTestCase {
             now: now,
             rules: rules
         )
-        XCTAssertEqual(genericPrompt?.title, "generic-project")
+        #expect(genericPrompt?.title == "generic-project")
 
         let long = SessionRunwayParser.compactTitle(String(repeating: "x", count: 80), fallback: "fallback")
-        XCTAssertEqual(long.count, 48)
-        XCTAssertTrue(long.hasSuffix("…"))
+        #expect(long.count == 48)
+        #expect(long.hasSuffix("…"))
     }
 
-    func testParentAndSubagentProduceOneRow() async {
+    @Test func parentAndSubagentProduceOneRow() async {
         let fixture = RunwayFixture()
         let parent = URL(fileURLWithPath: "/fixture/codex/sessions/rollout-parent-id.jsonl")
         let child = URL(fileURLWithPath: "/fixture/codex/sessions/parent-id/subagents/rollout-child-id.jsonl")
@@ -208,17 +208,17 @@ final class SessionRunwayTests: XCTestCase {
         )
 
         let snapshot = await makeScanner(fixture).scan()
-        XCTAssertEqual(snapshot.rows.count, 1)
-        XCTAssertEqual(snapshot.rows.first?.sessionID, "parent-id")
-        XCTAssertEqual(snapshot.rows.first?.childSessionCount, 1)
-        XCTAssertEqual(snapshot.diagnostics.groupedSubagentCount, 1)
+        #expect(snapshot.rows.count == 1)
+        #expect(snapshot.rows.first?.sessionID == "parent-id")
+        #expect(snapshot.rows.first?.childSessionCount == 1)
+        #expect(snapshot.diagnostics.groupedSubagentCount == 1)
     }
 
-    func testObservedBurnMathAndCodexDelta() async {
-        XCTAssertEqual(SessionRunwayBurnMath.tokensPerHour(deltaTokens: 100, interval: 10), 36_000)
-        XCTAssertEqual(SessionRunwayBurnMath.providerShare(deltaTokens: 25, providerDelta: 100), 0.25)
-        XCTAssertNil(SessionRunwayBurnMath.tokensPerHour(deltaTokens: 100, interval: 0))
-        XCTAssertNil(SessionRunwayBurnMath.providerShare(deltaTokens: 25, providerDelta: 0))
+    @Test func observedBurnMathAndCodexDelta() async {
+        #expect(SessionRunwayBurnMath.tokensPerHour(deltaTokens: 100, interval: 10) == 36_000)
+        #expect(SessionRunwayBurnMath.providerShare(deltaTokens: 25, providerDelta: 100) == 0.25)
+        #expect(SessionRunwayBurnMath.tokensPerHour(deltaTokens: 100, interval: 0) == nil)
+        #expect(SessionRunwayBurnMath.providerShare(deltaTokens: 25, providerDelta: 0) == nil)
 
         let fixture = RunwayFixture()
         let path = URL(fileURLWithPath: "/fixture/codex/sessions/rollout-burn.jsonl")
@@ -231,7 +231,7 @@ final class SessionRunwayTests: XCTestCase {
         )
         let scanner = makeScanner(fixture)
         let first = await scanner.scan()
-        XCTAssertEqual(first.rows.first?.burn.state, .measuring)
+        #expect(first.rows.first?.burn.state == .measuring)
 
         let secondTime = fixture.now.addingTimeInterval(60)
         fixture.now = secondTime
@@ -242,18 +242,18 @@ final class SessionRunwayTests: XCTestCase {
             data: codexTranscript(id: "burn-id", cwd: "/workspace/burn", prompt: "Measure burn", timestamp: secondTime, totalTokens: 300)
         )
         let second = await scanner.scan()
-        XCTAssertEqual(second.rows.first?.burn.state, .observed)
-        XCTAssertEqual(second.rows.first?.burn.observedTokenDelta, 200)
-        XCTAssertEqual(second.rows.first?.burn.observedTokensPerHour ?? 0, 12_000, accuracy: 0.01)
-        XCTAssertEqual(second.rows.first?.burn.shareOfObservedProviderBurn, 1)
+        #expect(second.rows.first?.burn.state == .observed)
+        #expect(second.rows.first?.burn.observedTokenDelta == 200)
+        #expect(abs((second.rows.first?.burn.observedTokensPerHour ?? 0) - 12_000) < 0.01)
+        #expect(second.rows.first?.burn.shareOfObservedProviderBurn == 1)
     }
 
-    func testEmptySourcesAndUnknownCandidateStayHonest() async {
+    @Test func emptySourcesAndUnknownCandidateStayHonest() async {
         let emptyFixture = RunwayFixture()
         let emptySnapshot = await makeScanner(emptyFixture).scan()
-        XCTAssertTrue(emptySnapshot.rows.isEmpty)
-        XCTAssertEqual(emptySnapshot.health[.codex], .missing)
-        XCTAssertEqual(emptySnapshot.health[.claudeCode], .missing)
+        #expect(emptySnapshot.rows.isEmpty)
+        #expect(emptySnapshot.health[.codex] == .missing)
+        #expect(emptySnapshot.health[.claudeCode] == .missing)
 
         let unknownFixture = RunwayFixture()
         let path = URL(fileURLWithPath: "/fixture/codex/sessions/rollout-unknown.jsonl")
@@ -265,11 +265,11 @@ final class SessionRunwayTests: XCTestCase {
             data: Data()
         )
         let unknownSnapshot = await makeScanner(unknownFixture).scan()
-        XCTAssertEqual(unknownSnapshot.rows.first?.state, .unknown)
-        XCTAssertEqual(unknownSnapshot.rows.first?.burn.state, .unsupported)
+        #expect(unknownSnapshot.rows.first?.state == .unknown)
+        #expect(unknownSnapshot.rows.first?.burn.state == .unsupported)
     }
 
-    func testLiveDiscoverySortsBeforeApplyingFileCap() throws {
+    @Test func liveDiscoverySortsBeforeApplyingFileCap() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("session-runway-cap-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -304,9 +304,9 @@ final class SessionRunwayTests: XCTestCase {
             now: now
         )
 
-        XCTAssertEqual(
-            discovered.map { $0.standardizedFileURL.path },
-            [recent.standardizedFileURL.path]
+        #expect(
+            discovered.map { $0.standardizedFileURL.path }
+                == [recent.standardizedFileURL.path]
         )
     }
 
