@@ -143,78 +143,97 @@ struct QuotaView: View {
     @ObservedObject var sessionStore: SessionActivityStore
     @ObservedObject var preferences: MenuBarPreferences
     @State private var now = Date()
+    @State private var showingSettings = false
+    @State private var selectedProvider: MenuBarProvider?
+    @State private var usageScanner = ModelUsageScanner()
 
     private let clock = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Usage Quotas")
-                .font(.headline)
-            Text("% used, not remaining (Codex's own app shows remaining)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.bottom, 2)
-
-            HStack(alignment: .top, spacing: 10) {
-                if let codex = store.codex {
-                    ProviderCard(quota: codex, now: now)
-                } else {
-                    emptyCard("Codex", "no data yet")
-                }
-                if let claude = store.claude {
-                    ProviderCard(quota: claude, now: now)
-                } else {
-                    emptyCard("Claude", "no data yet")
-                }
-                if let grok = store.grok {
-                    ProviderCard(quota: grok, now: now)
-                } else {
-                    emptyCard("Grok", "no data yet")
-                }
+        Group {
+            if showingSettings {
+                AppSettingsView(preferences: preferences) { showingSettings = false }
+            } else if let provider = selectedProvider {
+                ModelUsageView(provider: provider, scanner: usageScanner) { selectedProvider = nil }
+                    .id(provider)
+            } else {
+                dashboard
             }
-
-            if let message = store.claudeState.message {
-                HStack(spacing: 8) {
-                    Text(message)
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                    if store.claudeState.offersLogin {
-                        Button("Sign in to Claude") { store.signInToClaude() }
-                            .font(.caption2)
-                    }
-                }
-            }
-
-            SessionActivitySection(store: sessionStore, now: now)
-
-            Divider()
-
-            Picker("Menu bar shows", selection: $preferences.provider) {
-                ForEach(MenuBarProvider.allCases) { provider in
-                    Text(provider.displayName).tag(provider)
-                }
-            }
-            .pickerStyle(.segmented)
-            .font(.caption)
-
-            Button("Open Claude usage") {
-                if let url = URL(string: "https://claude.ai/settings/usage") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
-            .buttonStyle(.plain)
-            .font(.caption)
-
-            Button("Quit") {
-                NSApplication.shared.terminate(nil)
-            }
-            .buttonStyle(.plain)
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
         .padding(12)
         .frame(width: 470)
         .onReceive(clock) { t in now = t }
+    }
+
+    private var dashboard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Usage Quotas").font(.headline)
+                Spacer()
+                Button { showingSettings = true } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+            }
+            Text("% used, not remaining (Codex's own app shows remaining)")
+                .font(.caption2).foregroundStyle(.secondary)
+
+            if preferences.visibleProviders.isEmpty {
+                Text("All providers are disabled. Open Settings to enable a provider.")
+                    .font(.caption).foregroundStyle(.secondary).padding(.vertical, 12)
+            } else {
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach(preferences.visibleProviders) { provider in
+                        Button { selectedProvider = provider } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                if let quota = quota(for: provider) {
+                                    ProviderCard(quota: quota, now: now)
+                                } else {
+                                    emptyCard(provider.displayName, "no quota data yet")
+                                }
+                                Label("Model usage", systemImage: "chart.bar")
+                                    .font(.caption2).foregroundStyle(.secondary).padding(.leading, 10)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Show \(provider.displayName) model usage")
+                        .help("View tokens and API-equivalent cost by model")
+                    }
+                }
+            }
+            if preferences.enabledProviders.contains(.claude), let message = store.claudeState.message {
+                HStack(spacing: 8) {
+                    Text(message).font(.caption2).foregroundStyle(.orange)
+                    if store.claudeState.offersLogin {
+                        Button("Sign in to Claude") { store.signInToClaude() }.font(.caption2)
+                    }
+                }
+            }
+            if preferences.showSessionRunway {
+                SessionActivitySection(store: sessionStore, now: now)
+            }
+            Divider()
+            HStack {
+                if preferences.enabledProviders.contains(.claude) {
+                    Link("Open Claude usage", destination: URL(string: "https://claude.ai/settings/usage")!)
+                }
+                Spacer()
+                Button("Quit") { NSApplication.shared.terminate(nil) }
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain).font(.caption)
+        }
+    }
+
+    private func quota(for provider: MenuBarProvider) -> ProviderQuota? {
+        switch provider {
+        case .codex: return store.codex
+        case .claude: return store.claude
+        case .grok: return store.grok
+        }
     }
 
     private func emptyCard(_ name: String, _ message: String) -> some View {
@@ -233,12 +252,13 @@ struct MenuBarLabel: View {
     @ObservedObject var preferences: MenuBarPreferences
 
     var body: some View {
-        let pct = store.menuBarPct(for: preferences.provider)
+        let provider = preferences.effectiveProvider
+        let pct = provider.flatMap { store.menuBarPct(for: $0) }
         HStack(spacing: 4) {
             if let image = renderMenuBarGauge(pct: pct) {
                 Image(nsImage: image)
             }
-            Text(menuBarLabelText(provider: preferences.provider, pct: pct))
+            Text(provider.map { menuBarLabelText(provider: $0, pct: pct) } ?? "Usage")
         }
     }
 }

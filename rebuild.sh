@@ -5,12 +5,20 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP="$HOME/Applications/UsageMenuBar.app"
 CACHE_ROOT="${TMPDIR:-/tmp}/usage-menubar-build-cache"
+SIGNING_IDENTITY="${USAGE_MENUBAR_SIGNING_IDENTITY:-UsageMenuBar Local Signing}"
 
 mkdir -p "$CACHE_ROOT/clang" "$CACHE_ROOT/swift"
 export CLANG_MODULE_CACHE_PATH="$CACHE_ROOT/clang"
 export SWIFTPM_MODULECACHE_OVERRIDE="$CACHE_ROOT/swift"
 
 cd "$DIR"
+
+if ! security find-identity -v -p codesigning | grep -Fq "\"$SIGNING_IDENTITY\""; then
+  echo "Missing code-signing identity: $SIGNING_IDENTITY" >&2
+  echo "Create it once with: ./scripts/create-local-signing-identity.sh" >&2
+  exit 1
+fi
+
 echo "Building..."
 swift build --disable-sandbox -c release
 
@@ -31,7 +39,7 @@ mkdir -p "$APP/Contents/Resources/UsageMenuBar_UsageMenuBar.bundle"
 cp -R "$RESOURCE_BUNDLE"/. "$APP/Contents/Resources/UsageMenuBar_UsageMenuBar.bundle"/
 
 echo "Signing..."
-codesign --force --deep --sign - "$APP"
+codesign --force --deep --sign "$SIGNING_IDENTITY" "$APP"
 
 echo "Relaunching..."
 open "$APP"

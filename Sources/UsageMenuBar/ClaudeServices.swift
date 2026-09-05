@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import LocalAuthentication
 import Security
 
 // The parts that talk to the outside world on Claude's behalf: reading the OAuth
@@ -50,11 +51,17 @@ enum ClaudeCredentialReader {
     private static let legacyPath = NSString(string: "~/.claude/.credentials.json").expandingTildeInPath
 
     static func read() -> Data? {
+        let authenticationContext = LAContext()
+        authenticationContext.interactionNotAllowed = true
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "Claude Code-credentials",
             kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecReturnData as String: true
+            kSecReturnData as String: true,
+            // This read runs from a background refresh. If macOS cannot grant access
+            // silently, keep using the local snapshot instead of interrupting the user
+            // with a password dialog every time the refresh timer fires.
+            kSecUseAuthenticationContext as String: authenticationContext
         ]
         var item: CFTypeRef?
         if SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,

@@ -6,7 +6,7 @@ account-wide Claude, and account-wide Grok rate-limit quotas. Built as a self-ho
 
 ## How it works
 
-Polls Anthropic's OAuth usage endpoint every 60s using Claude Code credentials
+Polls Anthropic's OAuth usage endpoint at most every five minutes using Claude Code credentials
 from macOS Keychain. This account-wide reading includes both claude.ai and
 Claude Code usage. Reads local JSON snapshots for Codex and Claude fallback:
 - `~/.claude/usage-dashboard/claude-rate-limits.json`
@@ -39,7 +39,10 @@ with an authentication warning.
 - `Sources/UsageMenuBar/QuotaView.swift` — the dropdown UI (progress bars,
   reset countdowns, the menu bar provider picker) and the menu bar label.
 - `Sources/UsageMenuBar/MenuBarPreference.swift` — which single provider the
-  menu bar shows, persisted in `UserDefaults` under `menuBarProvider`.
+  menu bar shows, enabled providers and runway visibility, persisted in `UserDefaults`.
+- `Sources/UsageMenuBar/SettingsView.swift` — settings inside the dropdown.
+- `Sources/UsageMenuBar/ModelUsage*.swift` — local token parsing, on-demand background
+  scanning, dated API pricing and per-model detail UI. See `docs/model-usage.md`.
 - `Sources/UsageMenuBar/MenuBarGauge.swift` — the ten-block usage gauge drawn
   into an `NSImage` (a `MenuBarExtra` label only renders Text and Image).
 - `Sources/UsageMenuBar/UsageMenuBarApp.swift` — `@main` entry, sets
@@ -50,7 +53,7 @@ with an authentication warning.
 ```
 ./rebuild.sh
 ```
-Builds release, re-signs (adhoc), replaces the binary inside
+Builds release, signs with the persistent local identity, replaces the binary inside
 `~/Applications/UsageMenuBar.app`, and relaunches it. That's the only
 supported way to ship a change — don't hand-edit the `.app` bundle.
 

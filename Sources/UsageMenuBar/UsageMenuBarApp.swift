@@ -3,13 +3,16 @@ import AppKit
 
 @main
 struct UsageMenuBarApp: App {
-    @StateObject private var store = QuotaStore()
+    @StateObject private var store: QuotaStore
     @StateObject private var sessionStore = SessionActivityStore(
         provider: LocalSessionRunwayActivityProvider()
     )
-    @StateObject private var preferences = MenuBarPreferences()
+    @StateObject private var preferences: MenuBarPreferences
 
     init() {
+        let preferences = MenuBarPreferences()
+        _preferences = StateObject(wrappedValue: preferences)
+        _store = StateObject(wrappedValue: QuotaStore(preferences: preferences))
         // No Dock icon, no Cmd-Tab entry — pure menu bar utility.
         NSApplication.shared.setActivationPolicy(.accessory)
     }

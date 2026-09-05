@@ -25,6 +25,8 @@ final class QuotaStore: ObservableObject {
     private let codexPath = NSString(string: "~/.claude/usage-dashboard/codex-rate-limits.json").expandingTildeInPath
     private let grokLogPath = NSString(string: "~/.grok/logs/unified.jsonl").expandingTildeInPath
     private let dependencies: QuotaDependencies
+    private var enabledProviders: Set<MenuBarProvider>
+    private var preferencesSubscription: AnyCancellable?
     private var timer: Timer?
     private var refreshInProgress = false
     private var hasAccountClaudeUsage = false
@@ -39,8 +41,17 @@ final class QuotaStore: ObservableObject {
     }()
     private let iso = ISO8601DateFormatter()
 
-    init(dependencies: QuotaDependencies = .live, startImmediately: Bool = true) {
+    init(dependencies: QuotaDependencies = .live, startImmediately: Bool = true,
+         preferences: MenuBarPreferences? = nil) {
         self.dependencies = dependencies
+        enabledProviders = preferences?.enabledProviders ?? Set(MenuBarProvider.allCases)
+        preferencesSubscription = preferences?.$enabledProviders.dropFirst().sink { [weak self] enabled in
+            self?.enabledProviders = enabled
+            self?.refreshSnapshots()
+            if startImmediately {
+                Task { await self?.refreshClaudeAccountUsage() }
+            }
+        }
         refreshSnapshots()
         guard startImmediately else { return }
         Task { await refreshClaudeAccountUsage() }
@@ -53,17 +64,18 @@ final class QuotaStore: ObservableObject {
     }
 
     func refreshSnapshots() {
-        if let snapshot = loadClaudeSnapshot(),
+        if enabledProviders.contains(.claude), let snapshot = loadClaudeSnapshot(),
            !hasAccountClaudeUsage || snapshot.capturedAt.map({ $0 > (lastAccountSuccess ?? .distantPast) }) == true {
             claude = snapshot.quota
         }
-        codex = loadCodex()
-        grok = loadGrok()
+        if enabledProviders.contains(.codex) { codex = loadCodex() }
+        if enabledProviders.contains(.grok) { grok = loadGrok() }
     }
 
     // Asks Claude's API for current usage, at most once per refresh interval, skipping
     // entirely if a previous attempt is still running.
     func refreshClaudeAccountUsage() async {
+        guard enabledProviders.contains(.claude) else { return }
         guard !refreshInProgress else { return }
         guard dependencies.now() >= nextAccountRefresh else { return }
         refreshInProgress = true
@@ -90,6 +102,7 @@ final class QuotaStore: ObservableObject {
     }
 
     private func refreshCredentialsAndUsage() async {
+        guard enabledProviders.contains(.claude) else { return }
         switch await dependencies.refreshCLI() {
         case .refreshed:
             guard let credentials = decodeCredentials(), !isExpired(credentials) else {
@@ -111,6 +124,7 @@ final class QuotaStore: ObservableObject {
     // off until the time it names; anything else is reported as a failed request rather
     // than being silently ignored.
     private func requestUsage(credentials: ClaudeCredentials, mayRefreshAfterUnauthorized: Bool) async {
+        guard enabledProviders.contains(.claude) else { return }
         do {
             let response = try await dependencies.fetchUsage(credentials.claudeAiOauth.accessToken)
             if response.statusCode == 401, mayRefreshAfterUnauthorized {

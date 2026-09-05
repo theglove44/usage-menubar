@@ -11,10 +11,26 @@ from Anthropic; Codex and fallback data come from local snapshot files.
 
 ## What it does
 
-Menu bar label shows both providers' 5-hour usage at a glance. Click it for a
-dropdown with 5-hour and weekly quota bars. Each bar heats from yellow to red
-as usage rises, with a moving provider logo showing the exact percentage, plus
-a live "resets in Xh Ym" countdown for each.
+The menu bar shows one selected provider as a coloured ten-block gauge and
+percentage. Click it for 5-hour and weekly quota cards with reset countdowns.
+
+Open **Settings** in the dropdown to enable or disable Codex, Claude and Grok,
+choose which enabled provider appears in the menu bar, and show or hide
+**Session Runway**. Choices are saved automatically. Disabling a provider hides
+its card and stops subsequent quota refreshes; an already-running request may
+finish. This does not change accounts or terminate sessions. The runway switch
+controls display only. All providers can be disabled without losing Settings.
+
+Click any enabled **provider card** for per-model token totals and estimated
+API-equivalent cost in USD. Choose **Today**, **7 days** or **30 days**; use the
+refresh button to reread local usage. Input, cached reads, cache writes and output
+are shown separately. These are local records from this Mac, not account-wide
+billing totals. Prices use a bundled standard short-context rate table checked
+on **5 September 2026**. Unpriced models show **Price unavailable** and remain in
+token totals. The cost subtotal explicitly identifies partial pricing.
+
+See [Model usage and pricing](docs/model-usage.md) for sources, calculation rules
+and coverage limits.
 
 ## How it works
 
@@ -52,7 +68,7 @@ OAuth token leaves this Mac except in that request to Anthropic.
 ./scripts/test.sh
 ```
 
-40 tests. The suite uses Swift Testing rather than XCTest, because the macOS
+The suite uses Swift Testing rather than XCTest, because the macOS
 Command Line Tools no longer ship XCTest and this project deliberately avoids
 requiring a full Xcode install. The script adds the framework search paths that
 `swift test` does not supply on its own.
@@ -68,8 +84,9 @@ claude auth status
 
 `auth status` must report `"loggedIn": true`. Usage Menu Bar reads Claude
 Code's OAuth credential from macOS Keychain and refreshes account usage within
-60 seconds. The Claude CLI owns all OAuth renewal and Keychain writes. If macOS
-asks for Keychain access, choose **Always Allow**.
+60 seconds. The Claude CLI owns all OAuth renewal and Keychain writes. Background
+refreshes never open a Keychain password dialog; if silent access is unavailable,
+the app keeps using the latest local snapshot.
 
 If the refresh token is absent, revoked, or expired, silent renewal is
 impossible. The app keeps the latest snapshot and shows **Sign in to Claude**;
@@ -80,13 +97,23 @@ latest local Claude snapshot and displays a warning below the quota cards.
 
 ## Build & install
 
+Create the persistent local signing identity once:
+
+```
+./scripts/create-local-signing-identity.sh
+```
+
+Then build or rebuild the app with:
+
 ```
 ./rebuild.sh
 ```
 
-Builds release, re-signs (adhoc), replaces `~/Applications/UsageMenuBar.app`,
-relaunches it. Add it to Login Items (System Settings > General > Login Items)
-to have it start on boot.
+Builds release, signs it with the persistent local identity, replaces
+`~/Applications/UsageMenuBar.app`, and relaunches it. Stable signing lets macOS
+recognise later rebuilds as the same app, so Keychain approval survives updates.
+Add it to Login Items (System Settings > General > Login Items) to have it start
+on boot.
 
 The dropdown's **Open Claude usage** button opens
 `https://claude.ai/settings/usage`; it does not depend on a local dashboard
