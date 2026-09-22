@@ -49,7 +49,7 @@ struct ModelUsageView: View {
                             ForEach(rows) { row in modelRow(row) }
                         }
                     }
-                    .frame(maxHeight: 300)
+                    .frame(height: 230)
                 }
                 Text("This Mac only · \(report.filesRead) local files · updated \(report.capturedAt.formatted(date: .omitted, time: .shortened))")
                     .font(.caption2).foregroundStyle(.secondary)
@@ -62,7 +62,9 @@ struct ModelUsageView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("API-equivalent estimate · USD").font(.caption.bold())
                 Text("Standard short-context rates, checked \(ModelPricing.checkedDate). Includes recorded cache reads/writes. Excludes long-context and speed premiums, tool fees and tax. This is not your subscription bill.")
+                    .fixedSize(horizontal: false, vertical: true)
                 Text("Local records may omit web, cloud, other devices and older unsupported log formats. Unpriced models remain in token totals.")
+                    .fixedSize(horizontal: false, vertical: true)
                 if provider == .grok {
                     Text("Grok Build variants use the public Grok 4.6 rate for comparison.")
                 }

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Usage Menu Bar — Live Canvas alternatives</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #d9e1e7; color: #172331; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+    main { max-width: 1490px; margin: auto; padding: 38px 34px 52px; }
+    h1 { margin: 0; font-size: 29px; letter-spacing: -.9px; }
+    .intro { margin: 8px 0 28px; color: #4b5e6c; font-size: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; }
+    .concept h2 { margin: 0 0 5px; font-size: 20px; letter-spacing: -.5px; }
+    .concept > p { margin: 0 0 15px; min-height: 42px; color: #536474; font-size: 13px; line-height: 1.45; }
+    .stage { padding: 15px; background: #b9c8d2; border-radius: 17px; box-shadow: inset 0 1px 2px #67798650; }
+    .menubar { display: flex; justify-content: space-between; align-items: center; margin: -15px -15px 12px; padding: 5px 14px; height: 28px; border-radius: 17px 17px 0 0; background: #f6f7f8; font-size: 11px; font-weight: 600; color: #354552; }
+    .popover { min-height: 588px; overflow: hidden; border-radius: 12px; box-shadow: 0 16px 38px #19324232, 0 1px 2px #19324240; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 7px; }
+    .eyebrow { font-size: 10px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+    .note { color: #475a6a; font-size: 12px; line-height: 1.45; margin: 11px 0 0; }
+    .note b { color: #1c3041; }
+    .muted { opacity: .65; }
+    .pill { padding: 5px 8px; border-radius: 99px; font-size: 10px; font-weight: 750; letter-spacing: .02em; }
+    .mono { font-variant-numeric: tabular-nums; }
+
+    /* 1. Pulse board: every live session has equal weight. */
+    .board { padding: 18px 17px 14px; color: #093743; background: #e6f8f9; }
+    .board .top { color: #3f7984; }
+    .board h3 { margin: 19px 0 3px; font-size: 28px; line-height: 1.1; letter-spacing: -1.2px; }
+    .board .sub { color: #557d84; font-size: 12px; }
+    .board .status { margin: 18px 0 10px; display: flex; gap: 8px; }
+    .board .status div { flex: 1; padding: 10px 12px; background: #c6f0ee; border-radius: 9px; color: #0a686c; font-size: 11px; }
+    .board .status div:last-child { color: #806420; background: #fff0c9; }
+    .board .status strong { display: block; font-size: 26px; line-height: 1; margin-bottom: 3px; }
+    .board .session { margin-top: 8px; padding: 13px 13px 12px; background: #fff; border: 1px solid #b5e2e4; border-radius: 12px; box-shadow: 0 3px 10px #2c76800d; }
+    .board .session .pill { color: #0b7070; background: #d8f6f1; }
+    .board .session.wait .pill { color: #8a6515; background: #fff0c9; }
+    .board .session strong { font-size: 14px; }
+    .board .session .meta { margin-top: 7px; color: #62838b; font-size: 11px; }
+    .board .session .burn { margin-top: 12px; display: flex; justify-content: space-between; padding-top: 9px; border-top: 1px solid #e0eef0; color: #285963; font-size: 11px; }
+    .board .quota { margin-top: 20px; padding: 11px 12px; border-radius: 8px; color: #f1ffff; background: #124d5a; font-size: 11px; }
+    .board .quota .row + .row { margin-top: 8px; }
+    .board footer { margin-top: 16px; color: #4f7882; font-size: 11px; }
+
+    /* 2. Spotlight: one session dominates while others are still visible. */
+    .spotlight { padding: 19px 19px 15px; color: #1e2638; background: #f4f5f7; }
+    .spotlight .top { color: #6b7280; }
+    .spotlight h3 { margin: 22px 0 4px; font-size: 17px; font-weight: 600; }
+    .spotlight .lead { padding: 17px 17px 18px; margin-top: 13px; color: #fff; background: #244ce0; border-radius: 15px; box-shadow: 0 10px 21px #244ce02c; }
+    .spotlight .lead .pill { color: #243fc9; background: #e5e9ff; }
+    .spotlight .lead .project { margin-top: 28px; color: #cdd9ff; font-size: 12px; }
+    .spotlight .lead .title { margin-top: 3px; font-size: 24px; font-weight: 750; letter-spacing: -.9px; line-height: 1.05; }
+    .spotlight .lead .measure { display: flex; gap: 0; margin-top: 26px; padding-top: 12px; border-top: 1px solid #90a5ff80; }
+    .spotlight .lead .measure div { flex: 1; color: #d8e2ff; font-size: 10px; }
+    .spotlight .lead .measure div + div { padding-left: 12px; border-left: 1px solid #90a5ff80; }
+    .spotlight .lead .measure strong { display: block; color: #fff; margin-top: 4px; font-size: 21px; line-height: 1; font-weight: 700; }
+    .spotlight .next { margin-top: 18px; }
+    .spotlight .next .eyebrow { color: #777f90; }
+    .spotlight .waiting { margin-top: 9px; padding: 13px 12px; background: #fff; border-radius: 11px; border: 1px solid #e0e4e9; }
+    .spotlight .waiting strong { font-size: 13px; }
+    .spotlight .waiting .pill { color: #896017; background: #fff0c9; }
+    .spotlight .waiting small { display: block; color: #7a8492; margin-top: 5px; }
+    .spotlight .quota { margin-top: 21px; padding-top: 12px; border-top: 1px solid #d5dae1; }
+    .spotlight .quota .eyebrow { color: #777f90; }
+    .spotlight .quota .values { display: flex; gap: 8px; margin-top: 10px; }
+    .spotlight .quota .values div { flex: 1; padding: 10px 7px; border-radius: 8px; background: #e5e9f0; color: #526070; font-size: 10px; text-align: center; }
+    .spotlight .quota .values b { display: block; color: #29374b; font-size: 18px; }
+    .spotlight footer { margin-top: 18px; color: #6d7888; font-size: 11px; }
+
+    /* 3. Constellation: a spatial overview for parallel work. */
+    .constellation { position: relative; padding: 19px 18px 15px; color: #f5f1ff; background: #261c3f; }
+    .constellation .top { color: #aa9bc9; }
+    .constellation h3 { margin: 23px 0 3px; font-size: 29px; letter-spacing: -1.2px; }
+    .constellation .sub { color: #b6a8d0; font-size: 12px; }
+    .constellation .map { position: relative; height: 260px; margin: 17px -18px 0; background: radial-gradient(circle at 50% 46%, #47366e 0, #35254f 42%, #261c3f 72%); overflow: hidden; }
+    .constellation .map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .constellation .hub { position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%); width: 93px; height: 93px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 50%; background: #efe7ff; color: #51318a; box-shadow: 0 0 0 8px #9981bf22, 0 0 25px #bc9cff55; }
+    .constellation .hub strong { font-size: 28px; line-height: 1; }
+    .constellation .hub span { font-size: 9px; font-weight: 750; letter-spacing: .08em; }
+    .constellation .node { position: absolute; width: 115px; padding: 9px; border-radius: 9px; background: #e4d5ff; color: #45316e; box-shadow: 0 6px 15px #0e0a1b55; }
+    .constellation .node strong { display: block; font-size: 12px; line-height: 1.1; }
+    .constellation .node small { display: block; margin-top: 4px; font-size: 10px; color: #775e9a; }
+    .constellation .node.a { left: 5%; top: 20%; }
+    .constellation .node.b { right: 5%; bottom: 19%; background: #ffe6b9; color: #6b4a16; }
+    .constellation .node.b small { color: #9a7134; }
+    .constellation .legend { display: flex; justify-content: space-between; margin-top: 2px; padding: 0 2px 14px; border-bottom: 1px solid #604e7b; color: #baa9d5; font-size: 11px; }
+    .constellation .resource { margin-top: 15px; }
+    .constellation .resource .eyebrow { color: #ab96ce; }
+    .constellation .resource .bar { display: grid; grid-template-columns: 88px 1fr 35px; gap: 8px; align-items: center; margin-top: 11px; color: #d9cdeb; font-size: 11px; }
+    .constellation .track { height: 6px; border-radius: 9px; background: #524266; overflow: hidden; }
+    .constellation .fill { display: block; height: 100%; border-radius: inherit; background: #c49bff; }
+    .constellation footer { margin-top: 25px; color: #b7a5cf; font-size: 11px; }
+
+    @media (max-width: 1080px) { .grid { grid-template-columns: 1fr; max-width: 500px; margin: auto; } .concept > p { min-height: 0; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Three ways to develop Live Canvas</h1>
+    <p class="intro">All three lead with local session activity and keep account quota information in view. Figures and session names are illustrative.</p>
+    <div class="grid">
+      <section class="concept">
+        <h2>1. Pulse board</h2>
+        <p>Equal weight for each live session. Best when you often have several agents running and want to scan every state quickly.</p>
+        <div class="stage">
+          <div class="menubar"><span>● &nbsp; File &nbsp; Edit &nbsp; View</span><span>● 1 active &nbsp; 09:41</span></div>
+          <div class="popover board">
+            <div class="row top eyebrow"><span>SESSION RUNWAY</span><span>⚙</span></div>
+            <h3>What's running</h3><div class="sub">Updated just now · this Mac</div>
+            <div class="status"><div><strong>1</strong>Active</div><div><strong>1</strong>Waiting</div></div>
+            <div class="session"><div class="row"><strong>Usage Menu Bar</strong><span class="pill">ACTIVE</span></div><div class="meta">Codex · last activity just now</div><div class="burn"><span>Observed burn</span><b>~18k tok/h</b></div></div>
+            <div class="session wait"><div class="row"><strong>Research notes</strong><span class="pill">WAITING</span></div><div class="meta">Claude · last activity 4m ago</div><div class="burn"><span>Observed burn</span><b>No recent burn</b></div></div>
+            <div class="quota"><div class="row"><b>Claude 5-hour</b><span>53% used · reset in 3h</span></div><div class="row"><b>Codex weekly</b><span>3% used · reset in 6d</span></div></div>
+            <footer class="row"><span>Model usage ↗</span><span>Settings · Quit</span></footer>
+          </div>
+        </div>
+        <p class="note"><b>Trade-off:</b> strongest at a glance; two session cards use most of the menu height.</p>
+      </section>
+      <section class="concept">
+        <h2>2. Spotlight</h2>
+        <p>The most recently active session gets a generous stage. Waiting work and quota totals stay visible without competing for attention.</p>
+        <div class="stage">
+          <div class="menubar"><span>● &nbsp; File &nbsp; Edit &nbsp; View</span><span>● Usage Menu Bar &nbsp; 09:41</span></div>
+          <div class="popover spotlight">
+            <div class="row top eyebrow"><span>LIVE CANVAS</span><span>Settings ↗</span></div>
+            <h3>Your current focus</h3>
+            <div class="lead"><div class="row eyebrow"><span>CODEX SESSION</span><span class="pill">ACTIVE</span></div><div class="project">Project</div><div class="title">Usage Menu Bar</div><div class="measure"><div>LAST ACTIVITY<strong>Now</strong></div><div>OBSERVED BURN<strong>~18k<span style="font-size:11px"> tok/h</span></strong></div></div></div>
+            <div class="next"><span class="eyebrow">ALSO OPEN</span><div class="waiting"><div class="row"><strong>Research notes</strong><span class="pill">WAITING</span></div><small>Claude · last activity 4m ago</small></div></div>
+            <div class="quota"><div class="row eyebrow"><span>ACCOUNT QUOTAS · USED</span><span>Details ↗</span></div><div class="values"><div>Claude 5-hour<b>53%</b></div><div>Claude week<b>10%</b></div><div>Codex week<b>3%</b></div></div></div>
+            <footer class="row"><span>Refreshed just now</span><span>Quit</span></footer>
+          </div>
+        </div>
+        <p class="note"><b>Trade-off:</b> feels calm and personal; switching focus may move information around.</p>
+      </section>
+      <section class="concept">
+        <h2>3. Constellation</h2>
+        <p>A spatial map shows parallel work around a shared hub. A small quota panel grounds the visual in practical limits.</p>
+        <div class="stage">
+          <div class="menubar"><span>● &nbsp; File &nbsp; Edit &nbsp; View</span><span>◉ 2 live &nbsp; 09:41</span></div>
+          <div class="popover constellation">
+            <div class="row top eyebrow"><span>LIVE CANVAS</span><span>⚙</span></div>
+            <h3>Work in motion</h3><div class="sub">1 active · 1 waiting · refreshed just now</div>
+            <div class="map"><svg viewBox="0 0 400 260" preserveAspectRatio="none" aria-hidden="true"><path d="M174 103 L109 77 M224 143 L303 177" fill="none" stroke="#b99bdc" stroke-width="2" stroke-dasharray="4 5"/></svg><div class="hub"><strong>2</strong><span>LIVE</span></div><div class="node a"><strong>Usage Menu Bar</strong><small>● Active · Codex</small></div><div class="node b"><strong>Research notes</strong><small>● Waiting · Claude</small></div></div>
+            <div class="legend"><span>● Active · just now</span><span>● Waiting · 4m ago</span></div>
+            <div class="resource"><div class="row eyebrow"><span>QUOTAS · USED</span><span>See detail ↗</span></div><div class="bar"><span>Claude 5-hour</span><div class="track"><span class="fill" style="width:53%"></span></div><b>53%</b></div><div class="bar"><span>Claude week</span><div class="track"><span class="fill" style="width:10%"></span></div><b>10%</b></div><div class="bar"><span>Codex week</span><div class="track"><span class="fill" style="width:3%"></span></div><b>3%</b></div></div>
+            <footer class="row"><span>Model usage ↗</span><span>Settings · Quit</span></footer>
+          </div>
+        </div>
+        <p class="note"><b>Trade-off:</b> most expressive; needs a clear list mode for accessibility and many sessions.</p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

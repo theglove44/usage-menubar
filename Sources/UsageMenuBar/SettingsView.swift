@@ -22,10 +22,11 @@ struct AppSettingsView: View {
             }
             Text("Disabled providers are hidden and their quota refreshes stop. This does not change your accounts or running sessions.")
                 .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Divider()
             Toggle("Show Session Runway", isOn: $preferences.showSessionRunway)
                 .toggleStyle(.switch)
-            Text("Show local session activity below the provider cards.")
+            Text("Show local session activity in the Constellation dashboard.")
                 .font(.caption).foregroundStyle(.secondary)
             Divider()
             if let selected = preferences.effectiveProvider {

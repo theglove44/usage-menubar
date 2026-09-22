@@ -269,7 +269,7 @@ struct SessionActivityRow: View {
                     .fixedSize()
             }
             .font(.caption2)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 5)
         .accessibilityElement(children: .combine)

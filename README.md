@@ -7,12 +7,17 @@ Self-built replacement for [`shanggqm/codexU`](https://github.com/shanggqm/codex
 same idea, but self-hosted: no third-party binary. Claude usage comes directly
 from Anthropic; Codex and fallback data come from local snapshot files.
 
-![Usage Quotas dropdown](screenshot.png)
+## Screenshot
+
+![Provider and Session Runway settings](docs/images/settings.png)
 
 ## What it does
 
 The menu bar shows one selected provider as a coloured ten-block gauge and
-percentage. Click it for 5-hour and weekly quota cards with reset countdowns.
+percentage. Click it for the Constellation dashboard: a map of current local
+sessions, with quota bars and reset countdowns below. Switch the map to
+**List** for full session details and observed burn rates. The map shows up to
+four live sessions; a note reports when more are hidden.
 
 Open **Settings** in the dropdown to enable or disable Codex, Claude and Grok,
 choose which enabled provider appears in the menu bar, and show or hide
@@ -21,7 +26,7 @@ its card and stops subsequent quota refreshes; an already-running request may
 finish. This does not change accounts or terminate sessions. The runway switch
 controls display only. All providers can be disabled without losing Settings.
 
-Click any enabled **provider card** for per-model token totals and estimated
+Click a provider's **quota rows** for per-model token totals and estimated
 API-equivalent cost in USD. Choose **Today**, **7 days** or **30 days**; use the
 refresh button to reread local usage. Input, cached reads, cache writes and output
 are shown separately. These are local records from this Mac, not account-wide
