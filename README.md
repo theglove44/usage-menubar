@@ -7,7 +7,12 @@ Self-built replacement for [`shanggqm/codexU`](https://github.com/shanggqm/codex
 same idea, but self-hosted: no third-party binary. Claude usage comes directly
 from Anthropic; Codex and fallback data come from local snapshot files.
 
-## Screenshot
+## Screenshots
+
+The dashboard mockup uses fictional sample data. It does not show live sessions,
+local paths or account usage.
+
+![Constellation dashboard mockup with sample data](docs/images/constellation-dashboard-mockup.png)
 
 ![Provider and Session Runway settings](docs/images/settings.png)
 
