@@ -234,7 +234,8 @@ actor SessionRunwayScanner {
                 } ?? false
                 if outsideVisibleWindow && !pathProcessConfirmed && !registryConfirmed {
                     hiddenHistoricalCount += 1
-                    parsedCandidates.removeValue(forKey: path)
+                    // Keep the parse cache for unchanged historical files too.
+                    // They may become live through process/registry evidence later.
                     continue
                 }
 
@@ -304,7 +305,7 @@ actor SessionRunwayScanner {
 
     private func refreshCodexTitles() -> Bool {
         guard let database = configuration.codexStateDatabase else {
-            let changed = hasCheckedCodexStateDatabase
+            let changed = !hasCheckedCodexStateDatabase
             hasCheckedCodexStateDatabase = true
             codexTitleLookup = .none
             return changed

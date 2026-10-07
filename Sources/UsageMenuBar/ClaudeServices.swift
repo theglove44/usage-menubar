@@ -5,8 +5,7 @@ import Security
 
 // The parts that talk to the outside world on Claude's behalf: reading the OAuth
 // credentials Claude Code stores in the macOS Keychain, calling the usage API,
-// re-running `claude setup-token` when those credentials have expired, and opening a
-// login window when they cannot be recovered.
+// silently rechecking credentials, and opening a login window only when requested.
 //
 // QuotaDependencies is the reason this is testable. Every outside call is reached
 // through it, so tests substitute fakes and never touch the Keychain or the network.
@@ -23,24 +22,21 @@ struct ClaudeUsageHTTPResponse {
     }
 }
 
-enum ClaudeCLIRefreshResult: Equatable {
-    case refreshed
+enum ClaudeCredentialCheckResult: Equatable {
+    case available
     case loginRequired
-    case missing
-    case timedOut
-    case failed
 }
 
 struct QuotaDependencies {
     var readCredentials: () -> Data?
-    var refreshCLI: () async -> ClaudeCLIRefreshResult
+    var checkCredentials: () async -> ClaudeCredentialCheckResult
     var fetchUsage: (_ accessToken: String) async throws -> ClaudeUsageHTTPResponse
     var now: () -> Date
     var launchLogin: () throws -> Void
 
     static let live = QuotaDependencies(
         readCredentials: ClaudeCredentialReader.read,
-        refreshCLI: { await ClaudeCLI.refreshAuthentication() },
+        checkCredentials: { ClaudeCredentialReader.checkAuthentication() },
         fetchUsage: ClaudeUsageClient.fetch,
         now: Date.init,
         launchLogin: ClaudeCLI.launchLogin
@@ -50,7 +46,20 @@ struct QuotaDependencies {
 enum ClaudeCredentialReader {
     private static let legacyPath = NSString(string: "~/.claude/.credentials.json").expandingTildeInPath
 
+    // Legacy macOS Keychain ACL prompts are separate from LocalAuthentication.
+    // Serialise reads while disabling that interaction for this process, then
+    // restore the prior setting. This never changes the credential's access list.
+    private static let readLock = NSLock()
+
     static func read() -> Data? {
+        readLock.lock()
+        defer { readLock.unlock() }
+        var interactionWasAllowed = DarwinBoolean(false)
+        guard SecKeychainGetUserInteractionAllowed(&interactionWasAllowed) == errSecSuccess,
+              SecKeychainSetUserInteractionAllowed(false) == errSecSuccess else {
+            return FileManager.default.contents(atPath: legacyPath)
+        }
+        defer { SecKeychainSetUserInteractionAllowed(interactionWasAllowed.boolValue) }
         let authenticationContext = LAContext()
         authenticationContext.interactionNotAllowed = true
         let query: [String: Any] = [
@@ -69,6 +78,16 @@ enum ClaudeCredentialReader {
             return data
         }
         return FileManager.default.contents(atPath: legacyPath)
+    }
+
+    static func checkAuthentication() -> ClaudeCredentialCheckResult {
+        // Claude owns renewal. Its CLI status check may show a Keychain prompt,
+        // so background recovery only rereads credentials silently.
+        guard let data = read(),
+              let credentials = try? JSONDecoder().decode(ClaudeCredentials.self, from: data),
+              credentials.claudeAiOauth.expiresAt.map({ $0 > Date().timeIntervalSince1970 * 1000 }) ?? true
+        else { return .loginRequired }
+        return .available
     }
 }
 
@@ -93,10 +112,6 @@ enum ClaudeUsageClient {
 }
 
 enum ClaudeCLI {
-    private struct AuthStatus: Decodable {
-        let loggedIn: Bool
-    }
-
     static func locate() -> String? {
         let environmentPaths = ProcessInfo.processInfo.environment["PATH"]?
             .split(separator: ":")
@@ -108,22 +123,6 @@ enum ClaudeCLI {
             "/usr/local/bin/claude"
         ]
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
-    }
-
-    static func refreshAuthentication() async -> ClaudeCLIRefreshResult {
-        guard let executable = locate() else { return .missing }
-        let result = await ProcessRunner.run(
-            executable: executable,
-            arguments: ["auth", "status", "--json"],
-            timeout: 12
-        )
-        if result.timedOut { return .timedOut }
-        guard result.exitCode == 0,
-              let status = try? JSONDecoder().decode(AuthStatus.self, from: result.output)
-        else {
-            return result.exitCode == 1 ? .loginRequired : .failed
-        }
-        return status.loggedIn ? .refreshed : .loginRequired
     }
 
     static func launchLogin() throws {
@@ -140,61 +139,4 @@ enum ClaudeCLI {
 
 enum ClaudeCLIError: Error {
     case missing
-}
-
-private struct ProcessResult {
-    let exitCode: Int32
-    let output: Data
-    let timedOut: Bool
-}
-
-private final class ProcessCompletionState: @unchecked Sendable {
-    let lock = NSLock()
-    var completed = false
-    var timedOut = false
-}
-
-private enum ProcessRunner {
-    static func run(executable: String, arguments: [String], timeout: TimeInterval) async -> ProcessResult {
-        await withCheckedContinuation { continuation in
-            let process = Process()
-            let pipe = Pipe()
-            let state = ProcessCompletionState()
-
-            process.executableURL = URL(fileURLWithPath: executable)
-            process.arguments = arguments
-            process.standardOutput = pipe
-            process.standardError = pipe
-
-            @Sendable func finish() {
-                state.lock.lock()
-                guard !state.completed else { state.lock.unlock(); return }
-                state.completed = true
-                let timedOut = state.timedOut
-                state.lock.unlock()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                continuation.resume(returning: ProcessResult(
-                    exitCode: process.terminationStatus,
-                    output: data,
-                    timedOut: timedOut
-                ))
-            }
-
-            process.terminationHandler = { _ in finish() }
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(returning: ProcessResult(exitCode: -1, output: Data(), timedOut: false))
-                return
-            }
-
-            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                state.lock.lock()
-                guard !state.completed else { state.lock.unlock(); return }
-                state.timedOut = true
-                state.lock.unlock()
-                process.terminate()
-            }
-        }
-    }
 }

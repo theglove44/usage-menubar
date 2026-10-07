@@ -24,7 +24,7 @@ struct QuotaView: View {
     @State private var selectedProvider: MenuBarProvider?
     @State private var usageScanner = ModelUsageScanner()
 
-    private let clock = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+    private let clock = Timer.publish(every: 30, tolerance: 3, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Group {

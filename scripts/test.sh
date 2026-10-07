@@ -13,6 +13,7 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 FRAMEWORKS="$(xcode-select -p)/Library/Developer/Frameworks"
 INTEROP_LIB="$(xcode-select -p)/Library/Developer/usr/lib"
+TESTING_PLUGINS="$(xcode-select -p)/usr/lib/swift/host/plugins/testing"
 
 if [[ ! -d "$FRAMEWORKS/Testing.framework" ]]; then
   echo "Testing.framework not found under $FRAMEWORKS" >&2
@@ -21,6 +22,7 @@ if [[ ! -d "$FRAMEWORKS/Testing.framework" ]]; then
 fi
 
 exec swift test \
+  -Xswiftc -plugin-path -Xswiftc "$TESTING_PLUGINS" \
   -Xswiftc -F -Xswiftc "$FRAMEWORKS" \
   -Xlinker -rpath -Xlinker "$FRAMEWORKS" \
   -Xlinker -rpath -Xlinker "$INTEROP_LIB" \

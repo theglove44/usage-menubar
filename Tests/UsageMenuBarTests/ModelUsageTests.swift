@@ -34,7 +34,7 @@ struct ModelUsageTests {
         var credentialReads = 0
         let dependencies = QuotaDependencies(
             readCredentials: { credentialReads += 1; return nil },
-            refreshCLI: { .loginRequired },
+            checkCredentials: { .loginRequired },
             fetchUsage: { _ in Issue.record("Disabled provider made an HTTP request"); throw URLError(.badURL) },
             now: { now }, launchLogin: {})
         let store = QuotaStore(dependencies: dependencies, startImmediately: false, preferences: preferences)

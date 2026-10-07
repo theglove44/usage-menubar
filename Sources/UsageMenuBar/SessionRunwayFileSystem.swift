@@ -24,7 +24,9 @@ enum SessionRunwayLiveFileSystem {
             }
         }
 
-        var files: [URL] = []
+        // Read metadata once per file. Looking it up inside the sort comparator
+        // multiplies Foundation/filesystem work by the number of comparisons.
+        var files: [(url: URL, modifiedAt: Date)] = []
         var seen = Set<String>()
         for root in roots {
             guard let enumerator = fm.enumerator(
@@ -36,15 +38,13 @@ enum SessionRunwayLiveFileSystem {
                 guard isCandidate(url, provider: provider) else { continue }
                 let key = url.standardizedFileURL.path
                 guard seen.insert(key).inserted else { continue }
-                files.append(url)
+                guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .contentModificationDateKey]),
+                      values.isRegularFile == true else { continue }
+                files.append((url, values.contentModificationDate ?? .distantPast))
             }
         }
-        let sorted = files.sorted { lhs, rhs in
-            let left = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-            let right = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-            return left > right
-        }
-        return Array(sorted.prefix(rules.maxFilesPerProvider))
+        let sorted = files.sorted { $0.modifiedAt > $1.modifiedAt }
+        return sorted.prefix(rules.maxFilesPerProvider).map(\.url)
     }
 
     static func stat(_ url: URL) -> SessionRunwayFileStat? {

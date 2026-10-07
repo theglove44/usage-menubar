@@ -3,6 +3,52 @@ import Testing
 @testable import UsageMenuBar
 
 struct CodexLimitsTests {
+    @Test @MainActor func inaccessibleCredentialsNeverLaunchRecoveryAndBackOff() async {
+        var reads = 0
+        var checks = 0
+        var fetches = 0
+        var now = Date(timeIntervalSince1970: 1_000_000_000)
+        let dependencies = QuotaDependencies(
+            readCredentials: { reads += 1; return nil },
+            checkCredentials: { checks += 1; return .available },
+            fetchUsage: { _ in fetches += 1; return ClaudeUsageHTTPResponse(statusCode: 200, data: Self.accountUsage()) },
+            now: { now }, launchLogin: {}
+        )
+        let store = QuotaStore(dependencies: dependencies, startImmediately: false)
+        let previous = store.claude?.fiveHourPct
+        await store.refreshClaudeAccountUsage()
+        now = now.addingTimeInterval(60)
+        await store.refreshClaudeAccountUsage()
+        #expect(reads == 1)
+        #expect(checks == 0)
+        #expect(fetches == 0)
+        #expect(store.claude?.fiveHourPct == previous)
+        #expect(store.claudeState == .loginRequired)
+        now = now.addingTimeInterval(240)
+        await store.refreshClaudeAccountUsage()
+        #expect(reads == 2)
+    }
+
+    @Test @MainActor func failedRequestsAlsoBackOffForFiveMinutes() async {
+        var fetches = 0
+        var now = Date(timeIntervalSince1970: 1_000_000_000)
+        let dependencies = QuotaDependencies(
+            readCredentials: { Self.credentials(expiresAt: 2_000_000_000_000) },
+            checkCredentials: { .loginRequired },
+            fetchUsage: { _ in fetches += 1; throw URLError(.notConnectedToInternet) },
+            now: { now }, launchLogin: {}
+        )
+        let store = QuotaStore(dependencies: dependencies, startImmediately: false)
+        await store.refreshClaudeAccountUsage()
+        now = now.addingTimeInterval(60)
+        await store.refreshClaudeAccountUsage()
+        #expect(fetches == 1)
+        #expect(store.claudeState == .networkUnavailable)
+        now = now.addingTimeInterval(240)
+        await store.refreshClaudeAccountUsage()
+        #expect(fetches == 2)
+    }
+
     @Test func claudeAccountUsageDecodesAccountWideWindows() throws {
         let json = """
         {
@@ -44,11 +90,11 @@ struct CodexLimitsTests {
         #expect(limits.weeklyWindow?.window_minutes == 10080)
     }
 
-    @Test @MainActor func validClaudeTokenFetchesWithoutRefreshingCLI() async throws {
+    @Test @MainActor func validClaudeTokenFetchesWithoutRecheckingCredentials() async throws {
         var refreshCount = 0
         let dependencies = QuotaDependencies(
             readCredentials: { Self.credentials(expiresAt: 2_000_000_000_000) },
-            refreshCLI: { refreshCount += 1; return .refreshed },
+            checkCredentials: { refreshCount += 1; return .available },
             fetchUsage: { _ in ClaudeUsageHTTPResponse(statusCode: 200, data: Self.accountUsage()) },
             now: { Date(timeIntervalSince1970: 1_000_000_000) },
             launchLogin: {}
@@ -62,7 +108,7 @@ struct CodexLimitsTests {
         #expect(store.claudeState == .ready)
     }
 
-    @Test @MainActor func expiredTokenRefreshesCLIAndRereadsCredentials() async throws {
+    @Test @MainActor func expiredTokenRechecksAndRereadsCredentials() async throws {
         var credentialReadCount = 0
         var refreshCount = 0
         let dependencies = QuotaDependencies(
@@ -70,7 +116,7 @@ struct CodexLimitsTests {
                 credentialReadCount += 1
                 return Self.credentials(expiresAt: credentialReadCount == 1 ? 1 : 2_000_000_000_000)
             },
-            refreshCLI: { refreshCount += 1; return .refreshed },
+            checkCredentials: { refreshCount += 1; return .available },
             fetchUsage: { _ in ClaudeUsageHTTPResponse(statusCode: 200, data: Self.accountUsage()) },
             now: { Date(timeIntervalSince1970: 1_000_000_000) },
             launchLogin: {}
@@ -84,12 +130,12 @@ struct CodexLimitsTests {
         #expect(store.claudeState == .ready)
     }
 
-    @Test @MainActor func unauthorizedRefreshesAndRetriesOnce() async throws {
+    @Test @MainActor func unauthorizedRechecksCredentialsAndRetriesOnce() async throws {
         var fetchCount = 0
         var refreshCount = 0
         let dependencies = QuotaDependencies(
             readCredentials: { Self.credentials(expiresAt: 2_000_000_000_000) },
-            refreshCLI: { refreshCount += 1; return .refreshed },
+            checkCredentials: { refreshCount += 1; return .available },
             fetchUsage: { _ in
                 fetchCount += 1
                 return ClaudeUsageHTTPResponse(
@@ -109,10 +155,10 @@ struct CodexLimitsTests {
         #expect(store.claudeState == .ready)
     }
 
-    @Test @MainActor func failedSilentRefreshOffersLoginAndPreservesSnapshot() async throws {
+    @Test @MainActor func expiredCredentialsOfferLoginAndPreserveSnapshot() async throws {
         let dependencies = QuotaDependencies(
             readCredentials: { Self.credentials(expiresAt: 1, refreshToken: nil) },
-            refreshCLI: { .loginRequired },
+            checkCredentials: { .loginRequired },
             fetchUsage: { _ in throw URLError(.badServerResponse) },
             now: Date.init,
             launchLogin: {}
@@ -131,7 +177,7 @@ struct CodexLimitsTests {
         var fetchCount = 0
         let dependencies = QuotaDependencies(
             readCredentials: { Self.credentials(expiresAt: 2_000_000_000_000) },
-            refreshCLI: { .refreshed },
+            checkCredentials: { .available },
             fetchUsage: { _ in
                 fetchCount += 1
                 try await Task.sleep(nanoseconds: 30_000_000)
@@ -152,7 +198,7 @@ struct CodexLimitsTests {
     @Test @MainActor func networkFailureGetsOfflineState() async throws {
         let dependencies = QuotaDependencies(
             readCredentials: { Self.credentials(expiresAt: 2_000_000_000_000) },
-            refreshCLI: { .refreshed },
+            checkCredentials: { .available },
             fetchUsage: { _ in throw URLError(.notConnectedToInternet) },
             now: { Date(timeIntervalSince1970: 1_000_000_000) },
             launchLogin: {}
@@ -168,7 +214,7 @@ struct CodexLimitsTests {
         var launchCount = 0
         let dependencies = QuotaDependencies(
             readCredentials: { nil },
-            refreshCLI: { .loginRequired },
+            checkCredentials: { .loginRequired },
             fetchUsage: { _ in throw URLError(.badServerResponse) },
             now: Date.init,
             launchLogin: { launchCount += 1 }
@@ -185,7 +231,7 @@ struct CodexLimitsTests {
         var now = Date(timeIntervalSince1970: 1_000_000_000)
         let dependencies = QuotaDependencies(
             readCredentials: { Self.credentials(expiresAt: 2_000_000_000_000) },
-            refreshCLI: { .refreshed },
+            checkCredentials: { .available },
             fetchUsage: { _ in
                 fetchCount += 1
                 return ClaudeUsageHTTPResponse(statusCode: 200, data: Self.accountUsage())
@@ -210,7 +256,7 @@ struct CodexLimitsTests {
         var now = Date(timeIntervalSince1970: 1_000_000_000)
         let dependencies = QuotaDependencies(
             readCredentials: { Self.credentials(expiresAt: 2_000_000_000_000) },
-            refreshCLI: { .refreshed },
+            checkCredentials: { .available },
             fetchUsage: { _ in
                 fetchCount += 1
                 return ClaudeUsageHTTPResponse(statusCode: 429, data: Data(), retryAfter: 600)

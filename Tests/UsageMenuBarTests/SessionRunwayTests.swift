@@ -3,6 +3,31 @@ import Testing
 @testable import UsageMenuBar
 
 struct SessionRunwayTests {
+    @Test func unchangedHistoricalTranscriptsStayCachedButChangesAreRead() async {
+        let fixture = RunwayFixture()
+        let path = URL(fileURLWithPath: "/fixture/codex/sessions/rollout-cached.jsonl")
+        let old = fixture.now.addingTimeInterval(-17 * 60 * 60)
+        let transcript = codexTranscript(id: "cached", cwd: "/workspace", prompt: "History", timestamp: old)
+        fixture.add(provider: .codex, url: path, modifiedAt: old, size: 1, data: transcript)
+        let scanner = makeScanner(fixture)
+        let first = await scanner.scan()
+        let second = await scanner.scan()
+        #expect(first.rows.isEmpty && second.rows.isEmpty)
+        #expect(second.hiddenHistoricalCount == 1)
+        #expect(fixture.prefixReads == 1)
+
+        fixture.processSnapshot = SessionRunwayProcessSnapshot(
+            openTranscriptPaths: [path.path], liveProviders: [.codex], liveSessionIDs: [], available: true
+        )
+        let live = await scanner.scan()
+        #expect(live.rows.first?.state == .activeWorking)
+        #expect(fixture.prefixReads == 1)
+
+        fixture.update(path: path, modifiedAt: fixture.now, size: 2, data: transcript)
+        _ = await scanner.scan()
+        #expect(fixture.prefixReads == 2)
+    }
+
     @Test func recentTranscriptWithoutProcessIsNotActiveEvenAfterFileChange() async {
         let fixture = RunwayFixture()
         let firstTime = fixture.now.addingTimeInterval(-10)
@@ -314,7 +339,10 @@ struct SessionRunwayTests {
         let fileSystem = SessionRunwayFileSystem(
             discover: { provider, _, _, _ in fixture.files[provider] ?? [] },
             stat: { url in fixture.stats[url.standardizedFileURL.path] },
-            readPrefix: { url, _ in fixture.data[url.standardizedFileURL.path] },
+            readPrefix: { url, _ in
+                fixture.prefixReads += 1
+                return fixture.data[url.standardizedFileURL.path]
+            },
             readTail: { url, _ in fixture.data[url.standardizedFileURL.path] }
         )
         let processProbe = SessionRunwayProcessProbe(
@@ -342,6 +370,7 @@ private final class RunwayFixture: @unchecked Sendable {
     var stats: [String: SessionRunwayFileStat] = [:]
     var data: [String: Data] = [:]
     var processSnapshot = SessionRunwayProcessSnapshot.empty
+    var prefixReads = 0
 
     func add(provider: SessionRunwayProvider, url: URL, modifiedAt: Date, size: Int64, data: Data) {
         files[provider, default: []].append(url)

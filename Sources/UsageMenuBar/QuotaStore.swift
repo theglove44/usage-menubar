@@ -61,6 +61,7 @@ final class QuotaStore: ObservableObject {
                 await self?.refreshClaudeAccountUsage()
             }
         }
+        timer?.tolerance = 6
     }
 
     func refreshSnapshots() {
@@ -78,16 +79,19 @@ final class QuotaStore: ObservableObject {
         guard enabledProviders.contains(.claude) else { return }
         guard !refreshInProgress else { return }
         guard dependencies.now() >= nextAccountRefresh else { return }
+        // Every attempt has a cooldown, including inaccessible credentials and
+        // offline/failed requests. Otherwise those paths retry every minute.
+        nextAccountRefresh = dependencies.now().addingTimeInterval(accountRefreshInterval)
         refreshInProgress = true
         defer { refreshInProgress = false }
         claudeState = .refreshing
 
         guard let credentials = decodeCredentials() else {
-            await refreshCredentialsAndUsage()
+            claudeState = .loginRequired
             return
         }
         if isExpired(credentials) {
-            await refreshCredentialsAndUsage()
+            await rereadCredentialsAndUsage()
             return
         }
         await requestUsage(credentials: credentials, mayRefreshAfterUnauthorized: true)
@@ -101,26 +105,22 @@ final class QuotaStore: ObservableObject {
         }
     }
 
-    private func refreshCredentialsAndUsage() async {
+    private func rereadCredentialsAndUsage() async {
         guard enabledProviders.contains(.claude) else { return }
-        switch await dependencies.refreshCLI() {
-        case .refreshed:
+        switch await dependencies.checkCredentials() {
+        case .available:
             guard let credentials = decodeCredentials(), !isExpired(credentials) else {
                 claudeState = .loginRequired
                 return
             }
             await requestUsage(credentials: credentials, mayRefreshAfterUnauthorized: false)
-        case .missing:
-            claudeState = .cliMissing
         case .loginRequired:
             claudeState = .loginRequired
-        case .timedOut, .failed:
-            claudeState = .requestFailed
         }
     }
 
     // Handles the three answers the API gives besides success: 401 means the saved
-    // credentials expired, so refresh them once and retry; 429 means slow down, so back
+    // credentials changed, so reread them once and retry; 429 means slow down, so back
     // off until the time it names; anything else is reported as a failed request rather
     // than being silently ignored.
     private func requestUsage(credentials: ClaudeCredentials, mayRefreshAfterUnauthorized: Bool) async {
@@ -128,7 +128,7 @@ final class QuotaStore: ObservableObject {
         do {
             let response = try await dependencies.fetchUsage(credentials.claudeAiOauth.accessToken)
             if response.statusCode == 401, mayRefreshAfterUnauthorized {
-                await refreshCredentialsAndUsage()
+                await rereadCredentialsAndUsage()
                 return
             }
             if response.statusCode == 429 {

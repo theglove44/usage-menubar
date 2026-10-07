@@ -26,6 +26,7 @@ final class SessionActivityStore: ObservableObject {
                 self?.refresh()
             }
         }
+        timer?.tolerance = refreshInterval * 0.1
     }
 
     deinit {

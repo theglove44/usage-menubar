@@ -46,11 +46,14 @@ and coverage limits.
 
 Polls Anthropic's authenticated usage endpoint every five minutes for account-wide
 Claude usage (claude.ai plus Claude Code), using Claude Code's existing OAuth
-credentials from macOS Keychain. Before reporting an expired login, the app asks
-the installed Claude CLI to renew its credentials and then retries once. Legacy
-file-based credentials remain supported. Local snapshots are still checked every
+credentials from macOS Keychain. Background reads disable both macOS Keychain
+interaction and biometric interaction. Missing or expired credentials keep the
+local fallback visible and offer an explicit sign-in action. The app can reread
+credentials renewed by Claude Code, but never launches the CLI in the background.
+Legacy file-based credentials remain supported. Local snapshots are still checked every
 60 seconds and take over when newer than cached account data. HTTP 429 responses
-honour Anthropic's `Retry-After` value with a five-minute minimum backoff.
+honour Anthropic's `Retry-After` value with a five-minute minimum backoff. Failed
+requests and inaccessible credentials also wait five minutes before retrying.
 
 Codex usage and Claude fallback data come from:
 
@@ -72,6 +75,21 @@ note when the last reading is over an hour old.
 Only Anthropic's authenticated usage endpoint receives a network request. No
 OAuth token leaves this Mac except in that request to Anthropic.
 
+## Battery use
+
+Session monitoring still runs every 20 seconds, including while the dropdown is
+closed, so session activity and observed burn rates remain available. Discovery
+reads each file's date once before sorting. Unchanged transcripts, including
+hidden historical sessions, retain their parsed cache. Changed files are reread
+and old sessions confirmed by a live process remain visible.
+
+Timers allow macOS to group wake-ups (up to two seconds for session scans, six
+seconds for snapshots, and three seconds for countdowns). Per-model history is
+scanned only when opened or manually refreshed. These changes reduce repeated
+work without changing provider settings or the snapshot fallback.
+
+See [the measured results and verification limits](docs/battery-keychain-verification.md).
+
 ## Tests
 
 ```
@@ -81,7 +99,7 @@ OAuth token leaves this Mac except in that request to Anthropic.
 The suite uses Swift Testing rather than XCTest, because the macOS
 Command Line Tools no longer ship XCTest and this project deliberately avoids
 requiring a full Xcode install. The script adds the framework search paths that
-`swift test` does not supply on its own.
+`swift test` does not supply on its own, including the Swift Testing macro plugin.
 
 ## Claude authentication
 
@@ -93,14 +111,16 @@ claude auth status
 ```
 
 `auth status` must report `"loggedIn": true`. Usage Menu Bar reads Claude
-Code's OAuth credential from macOS Keychain and refreshes account usage within
-60 seconds. The Claude CLI owns all OAuth renewal and Keychain writes. Background
+Code's OAuth credential from macOS Keychain and checks account usage every five
+minutes. Claude Code owns OAuth renewal and Keychain writes. Background
 refreshes never open a Keychain password dialog; if silent access is unavailable,
 the app keeps using the latest local snapshot.
 
-If the refresh token is absent, revoked, or expired, silent renewal is
-impossible. The app keeps the latest snapshot and shows **Sign in to Claude**;
-clicking it opens `claude auth login --claudeai` in Terminal.
+If the saved access token is expired or silent Keychain access is denied,
+the app cannot obtain fresh account usage by itself. The app keeps the latest snapshot and shows **Sign in to Claude**;
+clicking it opens `claude auth login --claudeai` in Terminal. After signing in,
+account figures update on the next scheduled check; the failed-attempt cooldown
+remains in place.
 
 When authentication or Anthropic is unavailable, the app keeps showing the
 latest local Claude snapshot and displays a warning below the quota cards.
@@ -118,6 +138,17 @@ Then build or rebuild the app with:
 ```
 ./rebuild.sh
 ```
+
+If the macOS 27 SDK reports a missing `SwiftUIMacros` plugin with the installed
+Command Line Tools, use the installed macOS 26.5 SDK for both commands:
+
+```bash
+SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ./scripts/test.sh --disable-sandbox
+SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ./rebuild.sh
+```
+
+This keeps the macOS 14 deployment target; it does not change the selected
+system toolchain.
 
 Builds release, signs it with the persistent local identity, replaces
 `~/Applications/UsageMenuBar.app`, and relaunches it. Stable signing lets macOS
